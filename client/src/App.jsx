@@ -1,8 +1,18 @@
+import { Routes, Route } from "react-router-dom";
+import React from "react";
+import HomePage from "./pages/HomePage";
+import LoginPage from "./pages/LoginPage";
+import ProfilePage from "./pages/ProfilePage";
+
 function App() {
   return (
-    <>
-      <h1 className="text-3xl font-bold underline">Chat-App</h1>
-    </>
+    <div className="bg-[url('./src/assets/bgImage.svg')] bg-contain">
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
+      </Routes>
+    </div>
   );
 }
 
