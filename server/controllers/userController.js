@@ -1,6 +1,7 @@
 import User from "../models/userModel.js";
 import bcrypt from "bcryptjs";
 import { generateToken } from "../lib/utils.js";
+import cloudinary from "../lib/cloudinary.js";
 
 // Signup a new user
 
@@ -83,5 +84,60 @@ export const login = async (req, res) => {
     res.status(500).json({
       message: error.message,
     });
+  }
+};
+
+// Controller to check if User is autheneticated or not
+export const isAuthenticated = async (req, res) => {
+  const user = req.user;
+  res
+    .status(200)
+    .json({ success: true, user, message: "User is authenticated" });
+};
+
+// Controller to update user profile detail
+
+export const updateProfile = async (req, res) => {
+  try {
+    const { profilePic, fullName, bio } = req.body;
+
+    const userId = req.user._id;
+
+    const user = await User.findById(userId);
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    let updateduser;
+
+    if (!profilePic) {
+      updateduser = await User.findByIdAndUpdate(
+        userId,
+        {
+          fullName,
+          bio,
+        },
+        { new: true }
+      );
+    } else {
+      const upload = await cloudinary.uploader.upload(profilePic);
+      updateduser = await User.findByIdAndUpdate(
+        userId,
+        {
+          fullName,
+          bio,
+          profilePic: upload.secure_url,
+        },
+        { new: true }
+      );
+    }
+
+    res
+      .status(200)
+      .json({ message: "Profile updated successfully", user: updateduser });
+  } catch (error) {
+    console.log(error.message);
+    res.status(500).json({ message: error.message });
   }
 };
