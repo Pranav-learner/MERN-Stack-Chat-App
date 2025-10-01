@@ -1,5 +1,5 @@
 import jwt from "jsonwebtoken";
-import User from "../models/userModel.js";
+import User from "../models/User.model.js";
 
 // Middleware to check if user is authenticated
 export const protectedRoute = async (req, res, next) => {
