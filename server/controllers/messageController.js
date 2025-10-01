@@ -1,5 +1,8 @@
 import User from "../models/userModel.js";
 import Message from "../models/Message.model.js";
+import cloudinary from "../lib/cloudinary.js";
+import { io } from "../server.js";
+import { userSocketMap } from "../server.js";
 
 // Get all users except the logged in user
 export const getAllUsers = async (req, res) => {
@@ -61,6 +64,41 @@ export const markMessageAsSeen = async (req, res) => {
     const { userId } = req.params;
     await Message.findByIdAndUpdate(userId, { seen: true });
     res.status(200).json({ success: true, message: "Messages marked as seen" });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Controller to esnd message
+
+export const sendMessage = async (req, res) => {
+  try {
+    const { text, image } = req.body;
+    const receiverId = req.params.id;
+    const senderId = req.user._id;
+    let imageUrl;
+
+    // Upload image to Cloudinary
+    if (image) {
+      const upload = await cloudinary.uploader.upload(image);
+      imageUrl = upload.secure_url;
+    }
+    // Create a new message
+    const newMessage = await Message.create({
+      senderId,
+      receiverId,
+      text,
+      image: imageUrl,
+    });
+
+    // Emit the new message to the receiver's socket
+    const receiverSocketId = userSocketMap[receiverId];
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit("newMessage", newMessage);
+    }
+
+    res.status(201).json({ success: true, message: newMessage });
   } catch (error) {
     console.log(error);
     res.status(500).json({ success: false, message: error.message });
