@@ -11,6 +11,8 @@ const Sidebar = () => {
     users,
     selectedUser,
     setSelectedUser,
+    messages,
+    getMessages,
     unseenMessages,
     setUnseenMessages,
   } = useContext(ChatContext);
@@ -32,6 +34,12 @@ const Sidebar = () => {
   useEffect(() => {
     getUsers();
   }, [onlineUser]);
+
+  useEffect(() => {
+    if (selectedUser) {
+      getMessages(selectedUser._id);
+    }
+  }, [selectedUser]);
 
   return (
     <div
@@ -75,10 +83,13 @@ const Sidebar = () => {
       </div>
 
       <div className="flex flex-col">
-        {filteredUsers.forEach((user) => {})}
         {filteredUsers.map((user, index) => (
           <div
-            onClick={() => setSelectedUser(user)}
+            onClick={() => {
+              setSelectedUser(user);
+              setUnseenMessages((prev) => ({ ...prev, [user._id]: 0 }));
+              getMessages(user._id);
+            }}
             key={index}
             className={`relative flex tems-center gap-2 p-2 pl-4 rounded cursor-pointer max-sm:text-sm ${
               selectedUser?._id === user._id && "bg[#282142]/50"
@@ -92,7 +103,7 @@ const Sidebar = () => {
             <div className="felx flex-col leading-5">
               <p>{user?.fullName}</p>
 
-              {onlineUser.includes(user._id) ? (
+              {(onlineUser || []).includes(user._id) ? (
                 <span className="text-green-400 text-xs">Online</span>
               ) : (
                 <span className="text-neutral-400 text-xs">Offline</span>

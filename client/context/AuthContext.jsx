@@ -54,7 +54,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("token");
     setToken(null);
     setAuthUser(null);
-    setOnlineUser(null);
+    setOnlineUser([]);
     axios.defaults.headers.common["token"] = null;
     toast.success("User logged out successfully");
     socket.disconnect();

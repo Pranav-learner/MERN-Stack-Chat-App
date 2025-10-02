@@ -36,7 +36,7 @@ export const getAllUsers = async (req, res) => {
 export const getAllMessages = async (req, res) => {
   try {
     // getting both id , to get both messages
-    const { userId } = req.params;
+    const userId = req.params.id;
     const myId = req.user._id;
 
     const messages = await Message.find({
