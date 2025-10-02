@@ -70,7 +70,7 @@ export const markMessageAsSeen = async (req, res) => {
   }
 };
 
-// Controller to esnd message
+// Controller to send message
 
 export const sendMessage = async (req, res) => {
   try {

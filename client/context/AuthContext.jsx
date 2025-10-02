@@ -81,12 +81,15 @@ export const AuthProvider = ({ children }) => {
         userId: userData._id,
       },
     });
-    newSocket.connect();
-    setSocket(newSocket);
+    newSocket.on("connect", () => {});
 
     newSocket.on("getOnlineUsers", (userIds) => {
       setOnlineUser(userIds);
     });
+    newSocket.on("onlineUsers", (userId) => {
+      setOnlineUser(userId);
+    });
+    setSocket(newSocket);
   };
 
   useEffect(() => {

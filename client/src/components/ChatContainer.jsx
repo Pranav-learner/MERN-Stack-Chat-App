@@ -1,8 +1,15 @@
 import React, { useEffect, useRef } from "react";
 import assets, { messagesDummyData } from "../assets/assets";
 import { formatMessageTime } from "../lib/utils";
+import { useContext } from "react";
+import { ChatContext } from "../../context/ChatContext";
+import { AuthContext } from "../../context/AuthContext";
 
-function ChatContainer({ selectedUser, setSelectedUser }) {
+const ChatContainer = () => {
+  const { messages, selectedUser, setSelectedUser, sendMessage, getMessages } =
+    useContext(ChatContext);
+  const { authUser, onlineUsers } = useContext(AuthContext);
+
   const scrollEnd = useRef();
 
   useEffect(() => {
@@ -98,6 +105,6 @@ function ChatContainer({ selectedUser, setSelectedUser }) {
       <p className="text-lg font-medium text-white">Chat anytime, anywhere</p>
     </div>
   );
-}
+};
 
 export default ChatContainer;
