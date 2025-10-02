@@ -4,14 +4,13 @@ import toast from "react-hot-toast";
 import { useState, useEffect } from "react";
 import { io } from "socket.io-client";
 
-const backendUrl = import.meta.env.BACKEND_URL;
+const backendUrl = import.meta.env.VITE_BACKEND_URL;
 axios.defaults.baseURL = backendUrl;
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem("token"));
-
   const [authUser, setAuthUser] = useState(null);
   const [onlineUser, setOnlineUser] = useState([]);
   const [socket, setSocket] = useState(null);
@@ -96,6 +95,7 @@ export const AuthProvider = ({ children }) => {
     }
     checkAuth();
   }, []);
+
   const value = {
     axios,
     authUser,

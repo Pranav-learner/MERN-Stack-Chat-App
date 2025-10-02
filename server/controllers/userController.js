@@ -11,14 +11,18 @@ export const signup = async (req, res) => {
 
     // Check if all fields are filled
     if (!fullName || !email || !password || !bio) {
-      return res.status(400).json({ message: "All fields are required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "All fields are required" });
     }
 
     // Check if user already exists
     const userExists = await User.findOne({ email });
 
     if (userExists) {
-      return res.status(400).json({ message: "User already exists" });
+      return res
+        .status(400)
+        .json({ success: false, message: "User already exists" });
     }
 
     // Hashing  password for security
@@ -41,10 +45,8 @@ export const signup = async (req, res) => {
       message: "User created successfully",
     });
   } catch (error) {
-    console.log(error);
-    res.status(500).json({
-      message: error.message,
-    });
+    console.log(error.message);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
@@ -55,19 +57,25 @@ export const login = async (req, res) => {
 
     // Check if all fields are filled
     if (!email || !password) {
-      return res.status(400).json({ message: "All fields are required" });
+      return res
+        .status(400)
+        .json({ success: false, message: "All fields are required" });
     }
 
     // Check if user exists
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(400).json({ message: "User not found" });
+      return res
+        .status(400)
+        .json({ success: false, message: "User not found" });
     }
 
     // Check if password is correct
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
     if (!isPasswordCorrect) {
-      return res.status(400).json({ message: "Invalid credentials" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid credentials" });
     }
 
     // Generate token
@@ -106,7 +114,9 @@ export const updateProfile = async (req, res) => {
     const user = await User.findById(userId);
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
     }
 
     let updateduser;
@@ -133,9 +143,11 @@ export const updateProfile = async (req, res) => {
       );
     }
 
-    res
-      .status(200)
-      .json({ message: "Profile updated successfully", user: updateduser });
+    res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      user: updateduser,
+    });
   } catch (error) {
     console.log(error.message);
     res.status(500).json({ message: error.message });
