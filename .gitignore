@@ -23,6 +23,8 @@ db.sqlite3-journal
 # Ignore user-specific files
 user_data
 .sass-cache
+client/.env
+server/.env
 .env
 .env.example
 .env.local
@@ -32,7 +34,8 @@ user_data
 .env.development
 
 # Ignore node_modules
-node_modules
+client/node_modules/
+server/node_modules/
 
 # Ignore Django stuff
 *.sqlite3
