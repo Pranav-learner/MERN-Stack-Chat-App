@@ -1,0 +1,268 @@
+# Ignore logs
+logs
+*.log
+
+# Ignore cache data
+__pycache__
+*.pyc
+*.pyo
+*.egg
+*.egg-info
+dist
+build
+.tox
+.nox
+.coverage
+.cache
+nosetests.xml
+coverage.xml
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Ignore user-specific files
+user_data
+.sass-cache
+.env
+.env.example
+.env.local
+.env.prod
+.env.staging
+.env.test
+.env.development
+
+# Ignore node_modules
+node_modules
+
+# Ignore Django stuff
+*.sqlite3
+*.sqlite3-journal
+__pycache__
+local_settings.py
+db.sqlite3
+media
+static
+env.example
+env.local
+env.prod
+env.staging
+env.test
+env.development
+
+# Ignore pip builds
+pip-wheel
+share
+dist
+build
+
+# Ignore virtualenv
+.venv
+env
+ENV
+
+# Ignore coverage data
+coverage.xml
+nosetests.xml
+.coverage
+
+# Ignore pytest cache
+.cache
+
+# Ignore vscode
+.vscode
+
+# Ignore .idea directory
+.idea
+
+# Ignore .git directory
+.git
+
+# Ignore .vs directory
+.vs
+
+# Ignore .vscode directory
+.vscode
+
+# Ignore .DS_Store file
+.DS_Store
+
+# Ignore .pyc, .pyo, .pyd, .pyz, .pyo.d, .pyc.d, .pyz.d
+*.pyc
+*.pyo
+*.pyd
+*.pyz
+*.pyo.d
+*.pyc.d
+*.pyz.d
+
+# Ignore .egg, .egg-info, .eggs, .egg-info-PKG-INFO
+*.egg
+*.egg-info
+*.eggs
+*.egg-info-PKG-INFO
+
+# Ignore .mo, .mo.d, .po, .po.d
+*.mo
+*.mo.d
+*.po
+*.po.d
+
+# Ignore .pot, .pot.d
+*.pot
+*.pot.d
+
+# Ignore .psd1, .psd1.xml, .psd1.psd
+*.psd1
+*.psd1.xml
+*.psd1.psd
+
+# Ignore .plist
+*.plist
+
+# Ignore .vcxproj, .vcxproj.filters, .vcxproj.user
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+
+# Ignore .xcodeproj, .xcodeproj/project.pbxproj
+*.xcodeproj
+*.xcodeproj/project.pbxproj
+
+# Ignore .xcworkspace, .xcworkspace/contents.xcworkspacedata
+*.xcworkspace
+*.xcworkspace/contents.xcworkspacedata
+
+# Ignore .sln, .suo, .suo.d, .userprefs
+*.sln
+*.suo
+*.suo.d
+*.userprefs
+
+# Ignore .nupkg, .nupkg.d
+*.nupkg
+*.nupkg.d
+
+# Ignore .nuget
+*.nuget
+
+# Ignore .nuspec
+*.nuspec
+
+# Ignore .obj, .o, .obj.d, .o.d
+*.obj
+*.o
+*.obj.d
+*.o.d
+
+# Ignore .ipa, .xcarchive
+*.ipa
+*.xcarchive
+
+# Ignore .dSYM
+*.dSYM
+
+# Ignore .appiconset
+*.appiconset
+
+# Ignore .apptemplatecache
+*.apptemplatecache
+
+# Ignore .assetcatalog, .assetcatalog.d
+*.assetcatalog
+*.assetcatalog.d
+
+# Ignore .xcassets, .xcassets.d
+*.xcassets
+*.xcassets.d
+
+# Ignore .launchImage, .launchImage.d
+*.launchImage
+*.launchImage.d
+
+# Ignore .storyboardc
+*.storyboardc
+
+# Ignore .swiftpm, .swiftpm.d
+*.swiftpm
+*.swiftpm.d
+
+# Ignore .xcresultbundle
+*.xcresultbundle
+
+# Ignore .xccheckout
+*.xccheckout
+
+# Ignore .xcscmblueprint
+*.xcscmblueprint
+
+# Ignore .xcbuildconfiguration
+*.xcbuildconfiguration
+
+# Ignore .xcpluginconfiguration
+*.xcpluginconfiguration
+
+# Ignore .xcindexdata
+*.xcindexdata
+
+# Ignore .xcindex
+*.xcindex
+
+# Ignore .xcassets
+*.xcassets
+
+# Ignore .xcbuild
+*.xcbuild
+
+# Ignore .xcplugin
+*.xcplugin
+
+# Ignore .xcresultbundle
+*.xcresultbundle
+
+# Ignore .xccheckout
+*.xccheckout
+
+# Ignore .xcscmblueprint
+*.xcscmblueprint
+
+# Ignore .xcbuildconfiguration
+*.xcbuildconfiguration
+
+# Ignore .xcpluginconfiguration
+*.xcpluginconfiguration
+
+# Ignore .xcindexdata
+*.xcindexdata
+
+# Ignore .xcindex
+*.xcindex
+
+# Ignore .xcassets
+*.xcassets
+
+# Ignore .xcbuild
+*.xcbuild
+
+# Ignore .xcplugin
+*.xcplugin
+
+# Ignore .xcresultbundle
+*.xcresultbundle
+
+# Ignore .xccheckout
+*.xccheckout
+
+# Ignore .xcscmblueprint
+*.xcscmblueprint
+
+# Ignore .xcbuildconfiguration
+*.xcbuildconfiguration
+
+# Ignore .xcpluginconfiguration
+*.xcpluginconfiguration
+
+# Ignore .xcindexdata
+*.xcindexdata
+
+# Ignore .xcindex
+*.xcindex
