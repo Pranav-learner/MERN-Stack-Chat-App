@@ -93,15 +93,15 @@ export const AuthProvider = ({ children }) => {
   };
 
   useEffect(() => {
-    if (!token) {
-      delete axios.defaults.headers.common["token"];
-      setAuthUser(null);
-      return;
+    // read token immediately from storage to avoid making an unauthenticated check on first load
+    const initialToken = localStorage.getItem("token");
+    if (initialToken) {
+      axios.defaults.headers.common["token"] = initialToken;
+      if (!token) setToken(initialToken);
+      // only verify with server when we actually have a token
+      checkAuth();
     }
-
-    axios.defaults.headers.common["token"] = token;
-    checkAuth();
-  }, [token]);
+  }, []);
 
   const value = {
     axios,
