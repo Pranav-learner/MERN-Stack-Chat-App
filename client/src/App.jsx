@@ -10,7 +10,7 @@ import { Navigate } from "react-router-dom";
 function App() {
   const { authUser } = useContext(AuthContext);
   return (
-    <div className="bg-[url('/bgImage.svg')] bg-contain">
+    <div className="bg-[url('/bgImage1.jpg')] bg-contain">
       <Toaster />
       <Routes>
         <Route
