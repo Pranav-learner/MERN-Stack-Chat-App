@@ -65,14 +65,20 @@ app.use("/api/messages", messageRouter);
 app.use("/api/groups", groupRouter);
 
 // Connect to MongoDB
+console.log("Attempting to connect to MongoDB...");
 await connectDB();
+console.log("MongoDB connection attempt finished.");
 
-if (process.env.NODE_ENV !== "production") {
-  const PORT = process.env.PORT || 5000;
-  server.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-  });
-}
+const PORT = process.env.PORT || 5000;
+console.log(`Checking PORT: ${PORT}`);
+
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server is running on port ${PORT}`);
+});
+
+process.on("unhandledRejection", (err) => {
+  console.error("Unhandled Promise Rejection:", err);
+});
 
 // Export server for Vercel
 export default server;
