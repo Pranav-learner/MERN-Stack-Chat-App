@@ -2,7 +2,7 @@ import User from "../models/User.model.js";
 import Message from "../models/Message.model.js";
 import cloudinary from "../lib/cloudinary.js";
 import { io } from "../server.js";
-import { userSocketMap } from "../server.js";
+import { getUserSocket } from "../lib/redis.js"; // Import Redis helper
 
 // Get all users except the logged in user
 export const getAllUsers = async (req, res) => {
@@ -18,7 +18,7 @@ export const getAllUsers = async (req, res) => {
       const messages = await Message.find({
         senderId: user._id,
         receiverId: userId,
-        seen: false,
+        status: { $ne: "read" }, // Logic change for status
       });
       if (messages.length > 0) {
         unseenMessages[user._id] = messages.length;
@@ -32,43 +32,7 @@ export const getAllUsers = async (req, res) => {
   }
 };
 
-// Get all messages for selected user
-export const getAllMessages = async (req, res) => {
-  try {
-    // getting both id , to get both messages
-    const userId = req.params.id;
-    const myId = req.user._id;
-
-    const messages = await Message.find({
-      $or: [
-        { senderId: myId, receiverId: userId },
-        { senderId: userId, receiverId: myId },
-      ],
-    });
-    await Message.updateMany(
-      { senderId: userId, receiverId: myId },
-      { seen: true }
-    );
-
-    res.json({ success: true, messages });
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// Seen messages for selected user
-
-export const markMessageAsSeen = async (req, res) => {
-  try {
-    const { userId } = req.params;
-    await Message.findByIdAndUpdate(userId, { seen: true });
-    res.status(200).json({ success: true, message: "Messages marked as seen" });
-  } catch (error) {
-    console.log(error);
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
+// ... existing getAllMessages ...
 
 // Controller to send message
 
@@ -90,12 +54,21 @@ export const sendMessage = async (req, res) => {
       receiverId,
       text,
       image: imageUrl,
+      status: "sent",
     });
 
     // Emit the new message to the receiver's socket
-    const receiverSocketId = userSocketMap[receiverId];
+    const receiverSocketId = await getUserSocket(receiverId); // Get from Redis
     if (receiverSocketId) {
       io.to(receiverSocketId).emit("newMessage", newMessage);
+      // Update status to delivered immediately if user is online
+      newMessage.status = "delivered";
+      await newMessage.save();
+      // Notify sender that message updates
+      const senderSocketId = await getUserSocket(senderId);
+      if(senderSocketId) {
+          io.to(senderSocketId).emit("messageStatusUpdate", newMessage);
+      }
     }
 
     res.status(201).json({ success: true, message: newMessage });
@@ -104,3 +77,68 @@ export const sendMessage = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// Get all messages for selected user
+export const getAllMessages = async (req, res) => {
+  try {
+    const userId = req.params.id; // The other user (sender of messages)
+    const myId = req.user._id;
+
+    const messages = await Message.find({
+      $or: [
+        { senderId: myId, receiverId: userId },
+        { senderId: userId, receiverId: myId },
+      ],
+    });
+
+    // Mark incoming messages as read
+    const updateResult = await Message.updateMany(
+      { senderId: userId, receiverId: myId, status: { $ne: "read" } },
+      { status: "read" }
+    );
+
+    // If any messages were updated, notify the sender
+    if (updateResult.modifiedCount > 0) {
+        const senderSocketId = await getUserSocket(userId);
+        if (senderSocketId) {
+            io.to(senderSocketId).emit("messagesRead", { readerId: myId });
+        }
+    }
+
+    res.json({ success: true, messages });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// Seen messages for selected user
+
+// Mark messages as read manually (if needed)
+export const markMessageAsSeen = async (req, res) => {
+  try {
+    const { userId } = req.params; // The sender whose messages I'm reading
+    const myId = req.user._id;
+
+    const updateResult = await Message.updateMany(
+        { senderId: userId, receiverId: myId, status: { $ne: "read" } }, 
+        { status: "read" }
+    );
+
+    if (updateResult.modifiedCount > 0) {
+        const senderSocketId = await getUserSocket(userId);
+        if (senderSocketId) {
+            io.to(senderSocketId).emit("messagesRead", { readerId: myId });
+        }
+    }
+
+    res.status(200).json({ success: true, message: "Messages marked as read" });
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Controller to send message
+
+
