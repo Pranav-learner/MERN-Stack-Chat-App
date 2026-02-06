@@ -5,11 +5,15 @@ import http from "http";
 import { connectDB } from "./lib/db.js";
 import userRouter from "./routes/userRoute.js";
 import messageRouter from "./routes/messageRoute.js";
+import groupRouter from "./routes/groupRoute.js";
+import Group from "./models/Group.model.js";
 import { Server } from "socket.io";
 
 // Create Express app and HTTP server
 const app = express();
 const server = http.createServer(app);
+
+import { cacheUserSocket, removeUserSocket, getOnlineUsers } from "./lib/redis.js";
 
 // Intialise Socket.io
 export const io = new Server(server, {
@@ -18,24 +22,33 @@ export const io = new Server(server, {
   },
 });
 
-// Store online users
-export const userSocketMap = {}; // {userId : socketId}
-
 // Socket.io connection handler
-io.on("connection", (socket) => {
+io.on("connection", async (socket) => {
   const userId = socket.handshake.query.userId;
 
   if (userId) {
-    userSocketMap[userId] = socket.id;
+    await cacheUserSocket(userId, socket.id);
 
     // Emit online users to all connected clients
-    io.emit("onlineUsers", Object.keys(userSocketMap));
+    const onlineUsers = await getOnlineUsers();
+    io.emit("onlineUsers", onlineUsers);
+
+    // Join user to their group rooms
+    try {
+      const groups = await Group.find({ members: userId });
+      groups.forEach((group) => {
+        socket.join(group._id.toString());
+      });
+    } catch (error) {
+      console.error("Error joining group rooms:", error);
+    }
   }
 
-  socket.on("disconnect", () => {
+  socket.on("disconnect", async () => {
     if (userId) {
-      delete userSocketMap[userId];
-      io.emit("getOnlineUsers", Object.keys(userSocketMap));
+      await removeUserSocket(userId);
+      const onlineUsers = await getOnlineUsers();
+      io.emit("onlineUsers", onlineUsers);
     }
   });
 });
@@ -49,6 +62,7 @@ app.use("/api/status", (req, res) => {
 });
 app.use("/api/auth", userRouter);
 app.use("/api/messages", messageRouter);
+app.use("/api/groups", groupRouter);
 
 // Connect to MongoDB
 await connectDB();

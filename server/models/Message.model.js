@@ -10,10 +10,20 @@ const messageSchema = new mongoose.Schema(
     receiverId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
-      required: true,
+      required: false,
+    },
+    groupId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Group",
+      required: false,
     },
     text: { type: String },
-    seen: { type: Boolean, default: false },
+    // seen: { type: Boolean, default: false }, // Deprecated
+    status: {
+      type: String,
+      enum: ["sent", "delivered", "read"],
+      default: "sent",
+    },
     image: { type: String },
   },
   { timestamps: true }
