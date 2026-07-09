@@ -8,6 +8,7 @@ import messageRouter from "./routes/messageRoute.js";
 import groupRouter from "./routes/groupRoute.js";
 import identityRouter from "./routes/identityRoute.js";
 import deviceRouter from "./routes/deviceRoute.js";
+import trustRouter from "./routes/trustRoute.js";
 import Group from "./models/Group.model.js";
 import { Server } from "socket.io";
 
@@ -69,6 +70,8 @@ app.use("/api/groups", groupRouter);
 app.use("/api/identity", identityRouter);
 // Layer 3 Sprint 2 — Device Trust & Multi-Device Management (additive)
 app.use("/api/devices", deviceRouter);
+// Layer 3 Sprint 3 — Identity Verification & Trust Establishment (additive)
+app.use("/api/trust", trustRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
