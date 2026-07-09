@@ -58,6 +58,8 @@ describe("IntegrityVerifier", () => {
     const detached = engine.signDetached(kp.privateKey, "data");
     expect(verifier.verifySignedPayload(kp.publicKey, detached).code).toBe("missing-message");
     expect(verifier.verifySignedPayload(kp.publicKey, detached, "data").ok).toBe(true);
-    expect(verifier.verifySignedPayload(kp.publicKey, detached, "other").code).toBe("bad-signature");
+    expect(verifier.verifySignedPayload(kp.publicKey, detached, "other").code).toBe(
+      "bad-signature",
+    );
   });
 });

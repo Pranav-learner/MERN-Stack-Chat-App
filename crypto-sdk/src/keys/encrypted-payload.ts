@@ -156,7 +156,11 @@ export class EncryptedPayload {
     if (obj.alg !== SymmetricAlgorithm.AES_256_GCM) {
       throw new InvalidCiphertextError(`Unsupported algorithm ${String(obj.alg)}`);
     }
-    if (typeof obj.nonce !== "string" || typeof obj.ct !== "string" || typeof obj.tag !== "string") {
+    if (
+      typeof obj.nonce !== "string" ||
+      typeof obj.ct !== "string" ||
+      typeof obj.tag !== "string"
+    ) {
       throw new InvalidCiphertextError("Encrypted payload is missing required fields");
     }
     try {
@@ -167,7 +171,9 @@ export class EncryptedPayload {
         authTag: fromBase64Url(obj.tag),
       });
     } catch (cause) {
-      throw new InvalidCiphertextError("Encrypted payload fields are not valid base64url", { cause });
+      throw new InvalidCiphertextError("Encrypted payload fields are not valid base64url", {
+        cause,
+      });
     }
   }
 

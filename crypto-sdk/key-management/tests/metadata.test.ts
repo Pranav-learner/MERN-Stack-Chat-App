@@ -45,14 +45,26 @@ describe("metadata", () => {
   });
 
   it("different symmetric keys fingerprint differently", () => {
-    const a = computeFingerprint({ kind: KeyMaterialKind.SYMMETRIC, symmetricKey: SymmetricKey.generate() });
-    const b = computeFingerprint({ kind: KeyMaterialKind.SYMMETRIC, symmetricKey: SymmetricKey.generate() });
+    const a = computeFingerprint({
+      kind: KeyMaterialKind.SYMMETRIC,
+      symmetricKey: SymmetricKey.generate(),
+    });
+    const b = computeFingerprint({
+      kind: KeyMaterialKind.SYMMETRIC,
+      symmetricKey: SymmetricKey.generate(),
+    });
     expect(a).not.toBe(b);
   });
 
   it("touchMetadata updates only updatedAt", () => {
     const meta = createKeyMetadata(
-      { type: KeyType.SESSION, algorithm: "AES-256-GCM", purpose: KeyPurpose.ENCRYPTION, owner: "u", fingerprint: "f" },
+      {
+        type: KeyType.SESSION,
+        algorithm: "AES-256-GCM",
+        purpose: KeyPurpose.ENCRYPTION,
+        owner: "u",
+        fingerprint: "f",
+      },
       ctx,
     );
     const later = touchMetadata(meta, () => 1_700_000_100_000);

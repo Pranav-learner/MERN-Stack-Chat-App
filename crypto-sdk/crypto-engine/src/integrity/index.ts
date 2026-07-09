@@ -88,7 +88,8 @@ export class IntegrityVerifier {
 
   /** Structurally validate an {@link EncryptedPayload} (nonce/tag lengths, algorithm). */
   checkEncryptedPayload(payload: EncryptedPayload): IntegrityResult {
-    if (!(payload instanceof EncryptedPayload)) return fail("not-a-payload", "not an EncryptedPayload");
+    if (!(payload instanceof EncryptedPayload))
+      return fail("not-a-payload", "not an EncryptedPayload");
     if (payload.nonce.length !== GCM_NONCE_BYTES) return fail("bad-nonce", "invalid nonce length");
     if (payload.authTag.length !== GCM_TAG_BYTES) return fail("bad-tag", "invalid auth tag length");
     return ok;
@@ -96,7 +97,9 @@ export class IntegrityVerifier {
 
   /** Detect a version mismatch. */
   checkVersion(actual: number, expected: number): IntegrityResult {
-    return actual === expected ? ok : fail("version-mismatch", `expected v${expected}, got v${actual}`);
+    return actual === expected
+      ? ok
+      : fail("version-mismatch", `expected v${expected}, got v${actual}`);
   }
 
   /**
@@ -131,7 +134,8 @@ export class IntegrityVerifier {
     signed: SignedPayload,
     message?: Uint8Array | string,
   ): IntegrityResult {
-    if (!(signed instanceof SignedPayload)) return fail("not-a-signed-payload", "not a SignedPayload");
+    if (!(signed instanceof SignedPayload))
+      return fail("not-a-signed-payload", "not a SignedPayload");
     if (signed.isDetached && message === undefined) {
       return fail("missing-message", "detached signature requires the message");
     }

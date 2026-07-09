@@ -24,7 +24,13 @@ function makeKey(kind: "symmetric" | "keypair" | "shared" | "raw"): ManagedKey {
     const symmetricKey = SymmetricKey.generate();
     const material = { kind: KeyMaterialKind.SYMMETRIC as const, symmetricKey };
     const metadata = createKeyMetadata(
-      { type: KeyType.SESSION, algorithm: "AES-256-GCM", purpose: KeyPurpose.ENCRYPTION, owner: "o", fingerprint: computeFingerprint(material) },
+      {
+        type: KeyType.SESSION,
+        algorithm: "AES-256-GCM",
+        purpose: KeyPurpose.ENCRYPTION,
+        owner: "o",
+        fingerprint: computeFingerprint(material),
+      },
       { clock: systemClock, idGenerator: idGen },
     );
     return new ManagedKey({ metadata, material });
@@ -34,7 +40,13 @@ function makeKey(kind: "symmetric" | "keypair" | "shared" | "raw"): ManagedKey {
     const sharedSecret = SharedSecret.fromBytes(randomBytes(32));
     const material = { kind: KeyMaterialKind.SHARED_SECRET as const, sharedSecret };
     const metadata = createKeyMetadata(
-      { type: KeyType.SHARED_SECRET, algorithm: "shared-secret", purpose: KeyPurpose.DERIVATION, owner: "o", fingerprint: computeFingerprint(material) },
+      {
+        type: KeyType.SHARED_SECRET,
+        algorithm: "shared-secret",
+        purpose: KeyPurpose.DERIVATION,
+        owner: "o",
+        fingerprint: computeFingerprint(material),
+      },
       { clock: systemClock, idGenerator: idGen },
     );
     return new ManagedKey({ metadata, material });
@@ -42,7 +54,13 @@ function makeKey(kind: "symmetric" | "keypair" | "shared" | "raw"): ManagedKey {
   const bytes = randomBytes(48);
   const material = { kind: KeyMaterialKind.RAW as const, bytes };
   const metadata = createKeyMetadata(
-    { type: KeyType.GROUP, algorithm: "raw", purpose: KeyPurpose.ENCRYPTION, owner: "o", fingerprint: computeFingerprint(material) },
+    {
+      type: KeyType.GROUP,
+      algorithm: "raw",
+      purpose: KeyPurpose.ENCRYPTION,
+      owner: "o",
+      fingerprint: computeFingerprint(material),
+    },
     { clock: systemClock, idGenerator: idGen },
   );
   return new ManagedKey({ metadata, material });
@@ -64,7 +82,9 @@ describe("serializers", () => {
     const back = serializer.fromJSON(serializer.toJSON(key));
     expect(back.asKeyPair().publicKey.toRaw()).toEqual(key.asKeyPair().publicKey.toRaw());
     // private key survived (can derive the same public key)
-    expect(back.asKeyPair().privateKey.toPublicKey().toRaw()).toEqual(key.asKeyPair().publicKey.toRaw());
+    expect(back.asKeyPair().privateKey.toPublicKey().toRaw()).toEqual(
+      key.asKeyPair().publicKey.toRaw(),
+    );
   });
 
   it("round-trips through JSON, base64, and binary", () => {
@@ -84,7 +104,10 @@ describe("serializers", () => {
 
   it("detects a tampered metadata field (integrity failure)", () => {
     const serialized = serializer.serialize(makeKey("symmetric"));
-    const tampered: SerializedKey = { ...serialized, metadata: { ...serialized.metadata, owner: "attacker" } };
+    const tampered: SerializedKey = {
+      ...serialized,
+      metadata: { ...serialized.metadata, owner: "attacker" },
+    };
     expect(() => serializer.deserialize(tampered)).toThrow(SerializationError);
   });
 
@@ -98,15 +121,18 @@ describe("serializers", () => {
 
   it("detects a forged integrity value", () => {
     const serialized = serializer.serialize(makeKey("keypair"));
-    const tampered: SerializedKey = { ...serialized, integrity: { algorithm: "sha256", value: "0".repeat(64) } };
+    const tampered: SerializedKey = {
+      ...serialized,
+      integrity: { algorithm: "sha256", value: "0".repeat(64) },
+    };
     expect(() => serializer.deserialize(tampered)).toThrow(SerializationError);
   });
 
   it("rejects an unknown format tag", () => {
     const serialized = serializer.serialize(makeKey("raw"));
-    expect(() => serializer.deserialize({ ...serialized, format: "bogus" } as unknown as SerializedKey)).toThrow(
-      SerializationError,
-    );
+    expect(() =>
+      serializer.deserialize({ ...serialized, format: "bogus" } as unknown as SerializedKey),
+    ).toThrow(SerializationError);
   });
 
   it("rejects an unsupported (unmigratable) version", () => {
@@ -123,7 +149,10 @@ describe("serializers", () => {
   it("interops with the KeyManager export/import path", async () => {
     const km = new KeyManager();
     const key = await km.generateSessionKey({ owner: "u" });
-    const exported = (await km.exportKey(key.keyId, { includePrivate: true, encoding: "json" })) as string;
+    const exported = (await km.exportKey(key.keyId, {
+      includePrivate: true,
+      encoding: "json",
+    })) as string;
     const parsed = serializer.fromJSON(exported);
     expect(parsed.asSymmetricKey().bytes).toEqual(key.asSymmetricKey().bytes);
   });

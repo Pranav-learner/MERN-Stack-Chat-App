@@ -73,9 +73,15 @@ describe("asymmetric (X25519 key agreement)", () => {
     it("private: DER / PEM / JWK reconstruct the same public key", () => {
       const alg = AsymmetricAlgorithm.X25519;
       const expected = kp.publicKey.toRaw();
-      expect(PrivateKey.fromDER(kp.privateKey.toDER(), alg).toPublicKey().toRaw()).toEqual(expected);
-      expect(PrivateKey.fromPEM(kp.privateKey.toPEM(), alg).toPublicKey().toRaw()).toEqual(expected);
-      expect(PrivateKey.fromJWK(kp.privateKey.toJWK(), alg).toPublicKey().toRaw()).toEqual(expected);
+      expect(PrivateKey.fromDER(kp.privateKey.toDER(), alg).toPublicKey().toRaw()).toEqual(
+        expected,
+      );
+      expect(PrivateKey.fromPEM(kp.privateKey.toPEM(), alg).toPublicKey().toRaw()).toEqual(
+        expected,
+      );
+      expect(PrivateKey.fromJWK(kp.privateKey.toJWK(), alg).toPublicKey().toRaw()).toEqual(
+        expected,
+      );
     });
 
     it("generic export() dispatches on KeyFormat", () => {

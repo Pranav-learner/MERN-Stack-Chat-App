@@ -47,7 +47,9 @@ describe("MigrationRegistry", () => {
         throw new Error("boom");
       },
     });
-    expect(() => registry.migrate({ formatVersion: 1 } as SerializedKey, 2)).toThrow(MigrationError);
+    expect(() => registry.migrate({ formatVersion: 1 } as SerializedKey, 2)).toThrow(
+      MigrationError,
+    );
   });
 
   it("the serializer uses the registry to upgrade an older format", () => {

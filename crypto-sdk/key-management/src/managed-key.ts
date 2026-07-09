@@ -6,12 +6,7 @@
  * storage-agnostic and knows nothing about chat.
  */
 
-import type {
-  KeyPair,
-  PublicKey,
-  SymmetricKey,
-  SharedSecret,
-} from "@securechat/crypto-sdk";
+import type { KeyPair, PublicKey, SymmetricKey, SharedSecret } from "@securechat/crypto-sdk";
 import { KeyMaterialKind, type KeyMaterial, type KeyMetadata } from "./types/index.js";
 import { KeyValidationError } from "./errors/index.js";
 

@@ -38,7 +38,8 @@ function summarize(label: string, samples: number[], bytesPerOp?: number): Bench
   const sorted = [...samples].sort((a, b) => a - b);
   const totalMs = samples.reduce((s, x) => s + x, 0);
   const meanMs = totalMs / samples.length;
-  const pct = (p: number): number => sorted[Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length))]!;
+  const pct = (p: number): number =>
+    sorted[Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length))]!;
   const opsPerSecond = meanMs > 0 ? 1000 / meanMs : Infinity;
   const result: BenchmarkResult = {
     label,
@@ -106,7 +107,10 @@ export function sampleMemory(): MemorySample {
 // --- convenience benchmarks -------------------------------------------------
 
 /** Benchmark AES-256-GCM encryption of a payload of `payloadSize` bytes. */
-export function benchmarkEncryption(payloadSize = 1024, options: BenchmarkOptions = {}): BenchmarkResult {
+export function benchmarkEncryption(
+  payloadSize = 1024,
+  options: BenchmarkOptions = {},
+): BenchmarkResult {
   const key = SymmetricKey.generate();
   const data = randomBytes(payloadSize);
   return benchmarkSync(() => void encrypt(key, data), {
@@ -117,7 +121,10 @@ export function benchmarkEncryption(payloadSize = 1024, options: BenchmarkOption
 }
 
 /** Benchmark AES-256-GCM decryption of a payload of `payloadSize` bytes. */
-export function benchmarkDecryption(payloadSize = 1024, options: BenchmarkOptions = {}): BenchmarkResult {
+export function benchmarkDecryption(
+  payloadSize = 1024,
+  options: BenchmarkOptions = {},
+): BenchmarkResult {
   const key = SymmetricKey.generate();
   const payload = encrypt(key, randomBytes(payloadSize));
   return benchmarkSync(() => void decrypt(key, payload), {
@@ -128,7 +135,10 @@ export function benchmarkDecryption(payloadSize = 1024, options: BenchmarkOption
 }
 
 /** Benchmark Ed25519 signing of a `payloadSize`-byte message. */
-export function benchmarkSigning(payloadSize = 1024, options: BenchmarkOptions = {}): BenchmarkResult {
+export function benchmarkSigning(
+  payloadSize = 1024,
+  options: BenchmarkOptions = {},
+): BenchmarkResult {
   const kp = generateSigningKeyPair();
   const message = randomBytes(payloadSize);
   return benchmarkSync(() => void sign(kp.privateKey, message), {
@@ -139,7 +149,10 @@ export function benchmarkSigning(payloadSize = 1024, options: BenchmarkOptions =
 }
 
 /** Benchmark Ed25519 verification of a `payloadSize`-byte message. */
-export function benchmarkVerification(payloadSize = 1024, options: BenchmarkOptions = {}): BenchmarkResult {
+export function benchmarkVerification(
+  payloadSize = 1024,
+  options: BenchmarkOptions = {},
+): BenchmarkResult {
   const kp = generateSigningKeyPair();
   const message = randomBytes(payloadSize);
   const signature = sign(kp.privateKey, message);

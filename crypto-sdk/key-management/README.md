@@ -22,20 +22,20 @@ npm run build      # emit dist/ (build the SDK first: cd .. && npm run build)
 
 ## What's inside
 
-| Area | Pieces |
-|---|---|
-| **Manager** | `KeyManager` — generate / store / get / import / export / replace / rotate / delete / validate / expire / recover |
-| **Model** | `ManagedKey` (metadata + live SDK material) |
-| **Metadata** | `createKeyMetadata`, `computeFingerprint`, expiry helpers |
-| **Serialization** | `KeySerializer` — JSON / base64 / binary, versioned + SHA-256 integrity |
-| **Validation** | `KeyValidator` — format, length, fingerprint, expiry |
-| **Storage** | `KeyStorage` + `MemoryStorage`, `SecureStorage` (encrypt-at-rest), `Database`/`Hardware`/`CloudKms` placeholders |
-| **Cache** | `KeyCache` + `InMemoryKeyCache` (LRU + TTL + stats), `NoopKeyCache` |
-| **Repositories** | `Identity`, `Session`, `SharedSecret` (+ `PreKey`, `SignedPreKey`, `OneTime`, `Group` — future-ready) |
-| **Rotation** | policies (age/usage/expiry/composite/manual/never) + `RotationScheduler` + history |
-| **Recovery** | `RecoveryProvider` + `NoopRecoveryProvider` (future hook) |
-| **Migration** | `MigrationRegistry` (future format upgrades) |
-| **Errors** | `KeyManagementError` + 11 typed subclasses |
+| Area              | Pieces                                                                                                            |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **Manager**       | `KeyManager` — generate / store / get / import / export / replace / rotate / delete / validate / expire / recover |
+| **Model**         | `ManagedKey` (metadata + live SDK material)                                                                       |
+| **Metadata**      | `createKeyMetadata`, `computeFingerprint`, expiry helpers                                                         |
+| **Serialization** | `KeySerializer` — JSON / base64 / binary, versioned + SHA-256 integrity                                           |
+| **Validation**    | `KeyValidator` — format, length, fingerprint, expiry                                                              |
+| **Storage**       | `KeyStorage` + `MemoryStorage`, `SecureStorage` (encrypt-at-rest), `Database`/`Hardware`/`CloudKms` placeholders  |
+| **Cache**         | `KeyCache` + `InMemoryKeyCache` (LRU + TTL + stats), `NoopKeyCache`                                               |
+| **Repositories**  | `Identity`, `Session`, `SharedSecret` (+ `PreKey`, `SignedPreKey`, `OneTime`, `Group` — future-ready)             |
+| **Rotation**      | policies (age/usage/expiry/composite/manual/never) + `RotationScheduler` + history                                |
+| **Recovery**      | `RecoveryProvider` + `NoopRecoveryProvider` (future hook)                                                         |
+| **Migration**     | `MigrationRegistry` (future format upgrades)                                                                      |
+| **Errors**        | `KeyManagementError` + 11 typed subclasses                                                                        |
 
 ## Quick start
 
@@ -48,13 +48,13 @@ const km = new KeyManager();
 const identity = await km.generateIdentityKey({ owner: "user-1" });
 
 // Export public-only (safe to distribute); import into another manager.
-const pub = await km.exportKey(identity.keyId);          // JSON string
+const pub = await km.exportKey(identity.keyId); // JSON string
 const other = new KeyManager();
 await other.importKey(pub);
 
 // Rotate → new version linked to the old one; retrieve the lineage.
 const { previous, current } = await km.rotateKey(identity.keyId);
-console.log(previous.metadata.status);                    // "rotated"
+console.log(previous.metadata.status); // "rotated"
 console.log((await km.getHistory(current.keyId)).map((h) => h.version)); // [1, 2]
 ```
 
@@ -87,8 +87,9 @@ import { KeyManager, KeyNotFoundError, KeyManagementError } from "@securechat/ke
 try {
   await new KeyManager().getKey("missing");
 } catch (err) {
-  if (err instanceof KeyNotFoundError) { /* ... */ }
-  else if (err instanceof KeyManagementError) console.error(err.code, err.details);
+  if (err instanceof KeyNotFoundError) {
+    /* ... */
+  } else if (err instanceof KeyManagementError) console.error(err.code, err.details);
 }
 ```
 

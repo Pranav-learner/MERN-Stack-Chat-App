@@ -23,24 +23,28 @@ npm run build      # emit dist/ (build the SDK first: cd .. && npm run build)
 
 ## What's inside
 
-| Area | Pieces |
-|---|---|
-| **Symmetric** | `SymmetricEngine` (AES-256-GCM AEAD), `encryptData`/`decryptData`, streaming chunk primitives |
-| **Asymmetric** | `AsymmetricEngine` — X25519 agreement, small-order-point rejection, `fingerprint`, constant-time compare |
-| **Signatures** | `SignatureEngine` — Ed25519 sign/verify, attached & detached `SignedPayload` |
-| **Key derivation** | `MasterKey`, `KeyDerivation` (context/purpose separation), `deriveSessionKey` |
-| **Payloads** | `EncryptedBuffer`, `SignedPayload`, `EncryptedFile`, `EncryptedAttachment` |
-| **Files** | `FileEncryptor` — chunk-based buffer + streaming, reorder/truncation-safe |
-| **Integrity** | `computeChecksum`/`verifyChecksum`, `IntegrityVerifier` (non-throwing) |
-| **Benchmarks** | `benchmark`, `benchmarkEncryption/Decryption/Signing/Verification`, `sampleMemory` |
-| **Security** | `SecureBuffer` (auto-wipe via `using`), `analyzeRandomness`, `toBytes`/`assertBinary` |
-| **Errors** | `CryptoEngineError` family (extends the SDK's `CryptoError`) |
+| Area               | Pieces                                                                                                   |
+| ------------------ | -------------------------------------------------------------------------------------------------------- |
+| **Symmetric**      | `SymmetricEngine` (AES-256-GCM AEAD), `encryptData`/`decryptData`, streaming chunk primitives            |
+| **Asymmetric**     | `AsymmetricEngine` — X25519 agreement, small-order-point rejection, `fingerprint`, constant-time compare |
+| **Signatures**     | `SignatureEngine` — Ed25519 sign/verify, attached & detached `SignedPayload`                             |
+| **Key derivation** | `MasterKey`, `KeyDerivation` (context/purpose separation), `deriveSessionKey`                            |
+| **Payloads**       | `EncryptedBuffer`, `SignedPayload`, `EncryptedFile`, `EncryptedAttachment`                               |
+| **Files**          | `FileEncryptor` — chunk-based buffer + streaming, reorder/truncation-safe                                |
+| **Integrity**      | `computeChecksum`/`verifyChecksum`, `IntegrityVerifier` (non-throwing)                                   |
+| **Benchmarks**     | `benchmark`, `benchmarkEncryption/Decryption/Signing/Verification`, `sampleMemory`                       |
+| **Security**       | `SecureBuffer` (auto-wipe via `using`), `analyzeRandomness`, `toBytes`/`assertBinary`                    |
+| **Errors**         | `CryptoEngineError` family (extends the SDK's `CryptoError`)                                             |
 
 ## Quick start
 
 ```ts
 import {
-  SymmetricEngine, FileEncryptor, SignatureEngine, AsymmetricEngine, KeyDerivation,
+  SymmetricEngine,
+  FileEncryptor,
+  SignatureEngine,
+  AsymmetricEngine,
+  KeyDerivation,
 } from "@securechat/crypto-engine";
 import { generateSigningKeyPair, bytesToUtf8 } from "@securechat/crypto-sdk";
 
@@ -51,7 +55,9 @@ bytesToUtf8(new SymmetricEngine(key).decrypt(payload)); // "hello"
 
 // Chunked file encryption (buffer or stream).
 const fe = new FileEncryptor();
-const enc = fe.encryptBuffer(new Uint8Array([1, 2, 3]), key, { metadata: { contentType: "application/octet-stream" } });
+const enc = fe.encryptBuffer(new Uint8Array([1, 2, 3]), key, {
+  metadata: { contentType: "application/octet-stream" },
+});
 fe.decryptBuffer(enc, key); // Uint8Array([1,2,3])
 
 // Detached signature.
@@ -71,7 +77,7 @@ const shared = a.agree(alice.privateKey, bob.publicKey); // rejects small-order 
 
 ```ts
 const fe = new FileEncryptor({ chunkSize: 64 * 1024 });
-const frames = fe.encryptStream(sourceAsyncIterable, key);   // header + chunk frames
+const frames = fe.encryptStream(sourceAsyncIterable, key); // header + chunk frames
 for await (const plaintext of fe.decryptStream(frames, key)) sink.write(plaintext);
 ```
 

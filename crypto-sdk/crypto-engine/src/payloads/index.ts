@@ -245,7 +245,9 @@ export class EncryptedAttachment extends EncryptedFile {
 
   /** Parse a serialized attachment string. */
   static override deserialize(serialized: string): EncryptedAttachment {
-    return EncryptedAttachment.fromJSON(parseJson<EncryptedFileJSON>(serialized, "encrypted-attachment"));
+    return EncryptedAttachment.fromJSON(
+      parseJson<EncryptedFileJSON>(serialized, "encrypted-attachment"),
+    );
   }
 }
 

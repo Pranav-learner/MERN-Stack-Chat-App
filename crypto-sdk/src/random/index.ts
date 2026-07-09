@@ -9,7 +9,11 @@
  * Never use `Math.random()` for any of these.
  */
 
-import { randomBytes as nodeRandomBytes, randomUUID, randomInt as nodeRandomInt } from "node:crypto";
+import {
+  randomBytes as nodeRandomBytes,
+  randomUUID,
+  randomInt as nodeRandomInt,
+} from "node:crypto";
 import { RandomGenerationError, ValidationError } from "../errors/index.js";
 import { GCM_NONCE_BYTES, MAX_RANDOM_BYTES } from "../constants/index.js";
 import { toBase64Url, toHex } from "../encoding/index.js";

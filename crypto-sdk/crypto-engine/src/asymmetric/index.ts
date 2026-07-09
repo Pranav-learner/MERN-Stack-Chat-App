@@ -103,7 +103,9 @@ export class AsymmetricEngine {
     this.validatePublicKey(publicKey);
     const secret = deriveSharedSecret(privateKey, publicKey);
     if (this.isAllZero(secret.bytes)) {
-      throw new PublicKeyValidationError("Key agreement produced an all-zero shared secret (unsafe peer key)");
+      throw new PublicKeyValidationError(
+        "Key agreement produced an all-zero shared secret (unsafe peer key)",
+      );
     }
     return secret;
   }
@@ -121,10 +123,7 @@ export class AsymmetricEngine {
     if (raw.length !== 32) {
       throw new PublicKeyValidationError(`Public key must be 32 bytes, got ${raw.length}`);
     }
-    if (
-      publicKey.algorithm === AsymmetricAlgorithm.X25519 &&
-      isX25519SmallOrderPoint(raw)
-    ) {
+    if (publicKey.algorithm === AsymmetricAlgorithm.X25519 && isX25519SmallOrderPoint(raw)) {
       throw new PublicKeyValidationError("X25519 public key is a small-order point");
     }
   }

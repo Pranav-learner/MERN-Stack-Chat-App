@@ -54,11 +54,14 @@ describe("AsymmetricEngine", () => {
 
   it("importValidatedPublicKey imports and validates raw bytes", () => {
     const kp = engine.generateKeyAgreementKeyPair();
-    const imported = engine.importValidatedPublicKey(kp.publicKey.toRaw(), AsymmetricAlgorithm.X25519);
-    expect(imported.equals(kp.publicKey)).toBe(true);
-    expect(() => engine.importValidatedPublicKey(new Uint8Array(32), AsymmetricAlgorithm.X25519)).toThrow(
-      PublicKeyValidationError,
+    const imported = engine.importValidatedPublicKey(
+      kp.publicKey.toRaw(),
+      AsymmetricAlgorithm.X25519,
     );
+    expect(imported.equals(kp.publicKey)).toBe(true);
+    expect(() =>
+      engine.importValidatedPublicKey(new Uint8Array(32), AsymmetricAlgorithm.X25519),
+    ).toThrow(PublicKeyValidationError);
   });
 
   it("fingerprints keys (hex, base64, segments) deterministically", () => {
@@ -74,6 +77,8 @@ describe("AsymmetricEngine", () => {
   it("compares public keys in constant time", () => {
     const kp = engine.generateKeyAgreementKeyPair();
     expect(engine.comparePublicKeys(kp.publicKey, kp.publicKey)).toBe(true);
-    expect(engine.comparePublicKeys(kp.publicKey, engine.generateKeyAgreementKeyPair().publicKey)).toBe(false);
+    expect(
+      engine.comparePublicKeys(kp.publicKey, engine.generateKeyAgreementKeyPair().publicKey),
+    ).toBe(false);
   });
 });

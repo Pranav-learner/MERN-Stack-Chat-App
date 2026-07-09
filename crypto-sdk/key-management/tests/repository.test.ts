@@ -72,7 +72,9 @@ describe("BaseKeyRepository (via IdentityKeyRepository)", () => {
     const ctx = makeCtx();
     const repo = new IdentityKeyRepository(ctx);
     await repo.save(makeIdentityKey("owner-a", "id_1"));
-    await repo.save(makeIdentityKey("owner-a", "id_2").withMetadata({ status: KeyStatus.INACTIVE }));
+    await repo.save(
+      makeIdentityKey("owner-a", "id_2").withMetadata({ status: KeyStatus.INACTIVE }),
+    );
     await repo.save(makeIdentityKey("owner-b", "id_3"));
     expect(await repo.count()).toBe(3);
     expect((await repo.findByOwner("owner-a")).length).toBe(2);

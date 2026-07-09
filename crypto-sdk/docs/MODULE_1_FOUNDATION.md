@@ -96,19 +96,19 @@ graph TD
 Every primitive delegates to **Node.js's built-in `crypto` module**, which is
 backed by **OpenSSL** — a widely-audited, FIPS-capable, hardware-accelerated
 implementation. **No cryptographic primitive is implemented by hand** anywhere in
-this SDK. The SDK's job is to provide a *safe, typed, misuse-resistant* surface
+this SDK. The SDK's job is to provide a _safe, typed, misuse-resistant_ surface
 over those primitives, not to reinvent them.
 
 ### 1.3 Core design principles
 
-| Principle | How it shows up |
-|---|---|
-| **AEAD by default** | Symmetric encryption is only AES-256-GCM; there is no unauthenticated cipher and no "decrypt without verify" path. |
+| Principle                   | How it shows up                                                                                                                                |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **AEAD by default**         | Symmetric encryption is only AES-256-GCM; there is no unauthenticated cipher and no "decrypt without verify" path.                             |
 | **Immutable value objects** | `SymmetricKey`, `SharedSecret`, `EncryptedPayload`, etc. copy their inputs and return copies from getters, so internal state can't be mutated. |
-| **Fail loud, fail typed** | Invalid input throws a specific `CryptoError` subclass with a stable `.code`. |
-| **Chat-agnostic** | Nothing references messages, users, sockets, or the DB. The word "message" only appears as "the bytes being signed/hashed". |
-| **Derive, don't reuse** | A raw ECDH `SharedSecret` cannot be used as a key directly — it only exposes HKDF-based derivation. |
-| **Secrets don't leak** | Key/secret objects override `toJSON()`/return `"[SymmetricKey]"` so they don't spill into logs. |
+| **Fail loud, fail typed**   | Invalid input throws a specific `CryptoError` subclass with a stable `.code`.                                                                  |
+| **Chat-agnostic**           | Nothing references messages, users, sockets, or the DB. The word "message" only appears as "the bytes being signed/hashed".                    |
+| **Derive, don't reuse**     | A raw ECDH `SharedSecret` cannot be used as a key directly — it only exposes HKDF-based derivation.                                            |
+| **Secrets don't leak**      | Key/secret objects override `toJSON()`/return `"[SymmetricKey]"` so they don't spill into logs.                                                |
 
 ---
 
@@ -117,16 +117,16 @@ over those primitives, not to reinvent them.
 Modern, audited, and boring-on-purpose. Each choice below is the mainstream,
 well-reviewed option for its job.
 
-| Purpose | Algorithm | Why this one |
-|---|---|---|
-| **Secure random** | OS CSPRNG via `crypto.randomBytes` / `randomInt` / `randomUUID` | Draws from the kernel entropy pool (`getrandom(2)` / `BCryptGenRandom`). The only correct source for keys, nonces, salts, and IDs. Never `Math.random()`. |
-| **Symmetric encryption** | **AES-256-GCM** (AEAD) | NIST SP 800-38D standard; provides confidentiality **and** integrity in one pass; AES-NI hardware acceleration on virtually all servers; 256-bit key gives a large post-quantum safety margin for symmetric strength. 96-bit nonce, 128-bit tag. |
-| **Key agreement** | **X25519** (ECDH on Curve25519) | Fast, constant-time by construction, small 32-byte keys, no fragile parameter choices, immune to many curve-validation pitfalls of NIST P-curves. The de-facto standard for modern key exchange (Signal, TLS 1.3, WireGuard, age). |
-| **Digital signatures** | **Ed25519** (EdDSA) | Deterministic (no per-signature nonce to mishandle → avoids the PS3/Sony-style catastrophic RNG failures of ECDSA), fast verify, compact 64-byte signatures, constant-time. |
-| **Key derivation (from secrets)** | **HKDF** (RFC 5869, SHA-256) | The standard extract-then-expand KDF for turning a high-entropy input (like an X25519 output) into one or more independent, uniformly-random keys, with domain separation via the `info` parameter. |
-| **Key derivation (from passwords)** | **scrypt** | Memory-hard, deliberately slow; the right tool for the *separate* problem of stretching low-entropy human passwords. Provided for completeness; not on the session/transport path. |
-| **Hashing** | **SHA-256 / SHA-384 / SHA-512 / BLAKE2b-512** | SHA-2 is the ubiquitous, audited default for integrity/fingerprinting; BLAKE2b offered as a fast modern alternative. (These are unkeyed digests — not MACs, not password hashes.) |
-| **Encoding** | Base64, Base64URL (unpadded), Hex, UTF-8 | Deterministic, validated serialization at the binary↔text boundary. Base64URL (no padding) is used for JSON envelopes and JWK fields. |
+| Purpose                             | Algorithm                                                       | Why this one                                                                                                                                                                                                                                     |
+| ----------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Secure random**                   | OS CSPRNG via `crypto.randomBytes` / `randomInt` / `randomUUID` | Draws from the kernel entropy pool (`getrandom(2)` / `BCryptGenRandom`). The only correct source for keys, nonces, salts, and IDs. Never `Math.random()`.                                                                                        |
+| **Symmetric encryption**            | **AES-256-GCM** (AEAD)                                          | NIST SP 800-38D standard; provides confidentiality **and** integrity in one pass; AES-NI hardware acceleration on virtually all servers; 256-bit key gives a large post-quantum safety margin for symmetric strength. 96-bit nonce, 128-bit tag. |
+| **Key agreement**                   | **X25519** (ECDH on Curve25519)                                 | Fast, constant-time by construction, small 32-byte keys, no fragile parameter choices, immune to many curve-validation pitfalls of NIST P-curves. The de-facto standard for modern key exchange (Signal, TLS 1.3, WireGuard, age).               |
+| **Digital signatures**              | **Ed25519** (EdDSA)                                             | Deterministic (no per-signature nonce to mishandle → avoids the PS3/Sony-style catastrophic RNG failures of ECDSA), fast verify, compact 64-byte signatures, constant-time.                                                                      |
+| **Key derivation (from secrets)**   | **HKDF** (RFC 5869, SHA-256)                                    | The standard extract-then-expand KDF for turning a high-entropy input (like an X25519 output) into one or more independent, uniformly-random keys, with domain separation via the `info` parameter.                                              |
+| **Key derivation (from passwords)** | **scrypt**                                                      | Memory-hard, deliberately slow; the right tool for the _separate_ problem of stretching low-entropy human passwords. Provided for completeness; not on the session/transport path.                                                               |
+| **Hashing**                         | **SHA-256 / SHA-384 / SHA-512 / BLAKE2b-512**                   | SHA-2 is the ubiquitous, audited default for integrity/fingerprinting; BLAKE2b offered as a fast modern alternative. (These are unkeyed digests — not MACs, not password hashes.)                                                                |
+| **Encoding**                        | Base64, Base64URL (unpadded), Hex, UTF-8                        | Deterministic, validated serialization at the binary↔text boundary. Base64URL (no padding) is used for JSON envelopes and JWK fields.                                                                                                            |
 
 ### Why AES-256-GCM and not XChaCha20-Poly1305?
 
@@ -194,15 +194,15 @@ being a subclass). Functions that take "data" accept `Uint8Array | string`
 
 ### 4.1 `random`
 
-| Export | Signature | Purpose | Throws |
-|---|---|---|---|
-| `randomBytes` | `(length: number) => Uint8Array` | CSPRNG bytes, `1..1_048_576` | `ValidationError`, `RandomGenerationError` |
-| `generateNonce` | `(length = 12) => Uint8Array` | AEAD nonce (GCM size default) | `ValidationError` |
-| `generateIV` | `(length = 12) => Uint8Array` | alias of `generateNonce` | `ValidationError` |
-| `randomId` | `(byteLength = 16) => string` | URL-safe base64 id | — |
-| `randomHexId` | `(byteLength = 16) => string` | hex id | — |
-| `uuid` | `() => string` | RFC 4122 v4 UUID | `RandomGenerationError` |
-| `randomInt` | `(min, max) => number` | uniform int in `[min, max)` | `ValidationError`, `RandomGenerationError` |
+| Export          | Signature                        | Purpose                       | Throws                                     |
+| --------------- | -------------------------------- | ----------------------------- | ------------------------------------------ |
+| `randomBytes`   | `(length: number) => Uint8Array` | CSPRNG bytes, `1..1_048_576`  | `ValidationError`, `RandomGenerationError` |
+| `generateNonce` | `(length = 12) => Uint8Array`    | AEAD nonce (GCM size default) | `ValidationError`                          |
+| `generateIV`    | `(length = 12) => Uint8Array`    | alias of `generateNonce`      | `ValidationError`                          |
+| `randomId`      | `(byteLength = 16) => string`    | URL-safe base64 id            | —                                          |
+| `randomHexId`   | `(byteLength = 16) => string`    | hex id                        | —                                          |
+| `uuid`          | `() => string`                   | RFC 4122 v4 UUID              | `RandomGenerationError`                    |
+| `randomInt`     | `(min, max) => number`           | uniform int in `[min, max)`   | `ValidationError`, `RandomGenerationError` |
 
 ### 4.2 `encoding`
 
@@ -212,45 +212,45 @@ being a subclass). Functions that take "data" accept `Uint8Array | string`
 
 ### 4.3 `hashing`
 
-| Export | Signature |
-|---|---|
-| `hash` | `(data, algorithm = HashAlgorithm.SHA256) => Uint8Array` |
-| `sha256` / `sha512` / `blake2b512` | `(data) => Uint8Array` |
-| `hashHex` | `(data, algorithm?) => string` |
-| `hashFile` | `(path, algorithm?) => Promise<Uint8Array>` (streams large files) |
+| Export                             | Signature                                                         |
+| ---------------------------------- | ----------------------------------------------------------------- |
+| `hash`                             | `(data, algorithm = HashAlgorithm.SHA256) => Uint8Array`          |
+| `sha256` / `sha512` / `blake2b512` | `(data) => Uint8Array`                                            |
+| `hashHex`                          | `(data, algorithm?) => string`                                    |
+| `hashFile`                         | `(path, algorithm?) => Promise<Uint8Array>` (streams large files) |
 
 ### 4.4 `kdf`
 
-| Export | Signature | Notes |
-|---|---|---|
-| `hkdf` | `(ikm, { salt?, info?, length = 32, hash = SHA256 }) => Uint8Array` | RFC 5869 |
-| `deriveKeyFromPassword` | `(password, salt, { length = 32, cost = 32768, blockSize = 8, parallelization = 1 }) => Uint8Array` | scrypt |
+| Export                  | Signature                                                                                           | Notes    |
+| ----------------------- | --------------------------------------------------------------------------------------------------- | -------- |
+| `hkdf`                  | `(ikm, { salt?, info?, length = 32, hash = SHA256 }) => Uint8Array`                                 | RFC 5869 |
+| `deriveKeyFromPassword` | `(password, salt, { length = 32, cost = 32768, blockSize = 8, parallelization = 1 }) => Uint8Array` | scrypt   |
 
 ### 4.5 `symmetric`
 
-| Export | Signature | Notes |
-|---|---|---|
-| `generateKey` | `() => SymmetricKey` | AES-256 key |
-| `encrypt` | `(key, plaintext, { aad?, nonce? }) => EncryptedPayload` | AEAD |
-| `decrypt` | `(key, payload, { aad? }) => Uint8Array` | throws `DecryptionError` on any authentication failure |
+| Export        | Signature                                                | Notes                                                  |
+| ------------- | -------------------------------------------------------- | ------------------------------------------------------ |
+| `generateKey` | `() => SymmetricKey`                                     | AES-256 key                                            |
+| `encrypt`     | `(key, plaintext, { aad?, nonce? }) => EncryptedPayload` | AEAD                                                   |
+| `decrypt`     | `(key, payload, { aad? }) => Uint8Array`                 | throws `DecryptionError` on any authentication failure |
 
 **AAD note:** Associated Data is authenticated but not encrypted and is **not**
 stored in the payload. The exact same `aad` must be passed to `decrypt`.
 
 ### 4.6 `asymmetric`
 
-| Export | Signature | Notes |
-|---|---|---|
-| `generateKeyPair` | `(algorithm = X25519) => KeyPair` | X25519 (or Ed25519 for signing) |
+| Export               | Signature                                 | Notes                                 |
+| -------------------- | ----------------------------------------- | ------------------------------------- |
+| `generateKeyPair`    | `(algorithm = X25519) => KeyPair`         | X25519 (or Ed25519 for signing)       |
 | `deriveSharedSecret` | `(privateKey, publicKey) => SharedSecret` | X25519 ECDH; both keys must be X25519 |
 
 ### 4.7 `signatures`
 
-| Export | Signature | Notes |
-|---|---|---|
-| `generateSigningKeyPair` | `() => KeyPair` | Ed25519 |
-| `sign` | `(privateKey, message) => Signature` | requires Ed25519 key |
-| `verify` | `(publicKey, message, signature) => boolean` | returns `false` on bad sig; throws only on wrong key type |
+| Export                   | Signature                                    | Notes                                                     |
+| ------------------------ | -------------------------------------------- | --------------------------------------------------------- |
+| `generateSigningKeyPair` | `() => KeyPair`                              | Ed25519                                                   |
+| `sign`                   | `(privateKey, message) => Signature`         | requires Ed25519 key                                      |
+| `verify`                 | `(publicKey, message, signature) => boolean` | returns `false` on bad sig; throws only on wrong key type |
 
 ### 4.8 `keys` — value objects
 
@@ -323,10 +323,10 @@ stored in the payload. The exact same `aad` must be passed to `decrypt`.
 - **No protocol.** No handshake, no session/ratchet, no forward secrecy logic, no
   replay/ordering protection — these are explicitly deferred to later modules.
 - **No key persistence / distribution / revocation / rotation.**
-- **RAW import of *private* keys is unsupported.** Reconstructing a private
+- **RAW import of _private_ keys is unsupported.** Reconstructing a private
   `KeyObject` from only the 32-byte scalar needs a curve operation; to avoid
   hand-rolling curve math, use JWK/DER/PEM for private keys (all lossless). RAW
-  *export* of the private scalar is supported.
+  _export_ of the private scalar is supported.
 - **`wipe()` / `destroy()` are best-effort.** In a GC'd runtime (V8) secret bytes
   may have been copied before zeroing; this is hygiene, not a guarantee.
 - **No post-quantum primitives.** X25519/Ed25519 are classical ECC. (AES-256 has a
@@ -392,7 +392,7 @@ graph LR
 per `PROJECT_KNOWLEDGE.md`, the eventual integration surface is the message
 send/receive path (`server/controllers/messageController.js`,
 `groupController.js`) and the Socket.IO layer (`server/server.js`). Those modules
-will pass already-encrypted `EncryptedPayload` bytes through the *unchanged* chat
+will pass already-encrypted `EncryptedPayload` bytes through the _unchanged_ chat
 pipeline. This module deliberately stops short of that wiring.
 
 ---

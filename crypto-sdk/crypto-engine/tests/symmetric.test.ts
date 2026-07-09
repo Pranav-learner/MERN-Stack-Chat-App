@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { SymmetricKey, randomBytes, bytesToUtf8, DecryptionError, EncryptedPayload } from "@securechat/crypto-sdk";
 import {
-  SymmetricEngine,
-  EncryptedBuffer,
-  encryptData,
-  decryptData,
-} from "../src/index.js";
+  SymmetricKey,
+  randomBytes,
+  bytesToUtf8,
+  DecryptionError,
+  EncryptedPayload,
+} from "@securechat/crypto-sdk";
+import { SymmetricEngine, EncryptedBuffer, encryptData, decryptData } from "../src/index.js";
 
 describe("SymmetricEngine", () => {
   it("round-trips UTF-8 and binary", () => {
@@ -36,7 +37,9 @@ describe("SymmetricEngine", () => {
 
   it("encryptToBuffer attaches metadata and round-trips", () => {
     const engine = SymmetricEngine.withRandomKey();
-    const buf = engine.encryptToBuffer(randomBytes(100), { metadata: { contentType: "application/octet-stream" } });
+    const buf = engine.encryptToBuffer(randomBytes(100), {
+      metadata: { contentType: "application/octet-stream" },
+    });
     expect(buf).toBeInstanceOf(EncryptedBuffer);
     expect(buf.metadata.contentType).toBe("application/octet-stream");
     expect(buf.metadata.originalSize).toBe(100);
@@ -62,7 +65,11 @@ describe("SymmetricEngine", () => {
     const payload = engine.encrypt("hello world");
     const ct = payload.ciphertext;
     ct[0] ^= 0xff;
-    const tampered = new EncryptedPayload({ nonce: payload.nonce, ciphertext: ct, authTag: payload.authTag });
+    const tampered = new EncryptedPayload({
+      nonce: payload.nonce,
+      ciphertext: ct,
+      authTag: payload.authTag,
+    });
     expect(() => engine.decrypt(tampered)).toThrow(DecryptionError);
   });
 });

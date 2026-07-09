@@ -38,7 +38,11 @@ describe("SignatureEngine", () => {
     const kp = generateSigningKeyPair();
     const signed = engine.signPayload(kp.privateKey, "original");
     // Rebuild with a mismatching attached payload but the original signature.
-    const forged = new SignedPayload(signed.signature, signed.metadata, new TextEncoder().encode("modified"));
+    const forged = new SignedPayload(
+      signed.signature,
+      signed.metadata,
+      new TextEncoder().encode("modified"),
+    );
     expect(engine.verifyPayload(kp.publicKey, forged)).toBe(false);
   });
 

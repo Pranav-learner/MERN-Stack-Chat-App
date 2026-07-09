@@ -22,11 +22,7 @@ import {
   randomBytes,
   utf8ToBytes,
 } from "@securechat/crypto-sdk";
-import {
-  DerivationPurpose,
-  type DerivationContext,
-  type DeriveOptions,
-} from "../types/index.js";
+import { DerivationPurpose, type DerivationContext, type DeriveOptions } from "../types/index.js";
 import { DerivationError } from "../errors/index.js";
 import { cloneBytes, wipe } from "../security/index.js";
 
@@ -109,7 +105,10 @@ export class MasterKey {
   }
 
   /** Derive a 32-byte {@link SymmetricKey} for a `(context, purpose)`. */
-  deriveSymmetricKey(context: DerivationContext, options: Omit<DeriveOptions, "length"> = {}): SymmetricKey {
+  deriveSymmetricKey(
+    context: DerivationContext,
+    options: Omit<DeriveOptions, "length"> = {},
+  ): SymmetricKey {
     return SymmetricKey.fromBytes(this.deriveBytes(context, { ...options, length: 32 }));
   }
 

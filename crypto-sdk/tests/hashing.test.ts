@@ -22,9 +22,7 @@ describe("hashing", () => {
   });
 
   it("SHA-256('') matches the known vector", () => {
-    expect(hashHex("")).toBe(
-      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    );
+    expect(hashHex("")).toBe("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
   });
 
   it("SHA-512('abc') matches the known vector", () => {

@@ -46,8 +46,12 @@ describe("rotation policies", () => {
     const age = new AgeBasedRotationPolicy(4000);
     const usage = new UsageBasedRotationPolicy(10);
     expect(new CompositeRotationPolicy([age, usage], "any").shouldRotate(key, { now })).toBe(true);
-    expect(new CompositeRotationPolicy([age, usage], "all").shouldRotate(key, { now, usageCount: 0 })).toBe(false);
-    expect(new CompositeRotationPolicy([age, usage], "all").shouldRotate(key, { now, usageCount: 10 })).toBe(true);
+    expect(
+      new CompositeRotationPolicy([age, usage], "all").shouldRotate(key, { now, usageCount: 0 }),
+    ).toBe(false);
+    expect(
+      new CompositeRotationPolicy([age, usage], "all").shouldRotate(key, { now, usageCount: 10 }),
+    ).toBe(true);
   });
 
   it("rejects invalid policy parameters", () => {
@@ -64,7 +68,9 @@ describe("RotationScheduler (pure evaluation, no auto-rotation)", () => {
       makeIdentityKey("o", "a").withMetadata({ createdAt: toIso(now - 10_000) }),
       makeIdentityKey("o", "b").withMetadata({ createdAt: toIso(now - 100) }),
     ];
-    const decisions = new RotationScheduler().evaluate(keys, new AgeBasedRotationPolicy(5000), { now });
+    const decisions = new RotationScheduler().evaluate(keys, new AgeBasedRotationPolicy(5000), {
+      now,
+    });
     expect(decisions.find((d) => d.keyId === "a")?.shouldRotate).toBe(true);
     expect(decisions.find((d) => d.keyId === "b")?.shouldRotate).toBe(false);
     expect(decisions[0]?.policy).toBe("age-based");

@@ -1,0 +1,70 @@
+name: Crypto SDK (Layer 2)
+
+# CI for the Layer 2 Crypto SDK stack only. Does not build or touch the chat
+# backend (server/ , client/).
+on:
+  push:
+    paths:
+      - "crypto-sdk/**"
+      - ".github/workflows/crypto-sdk.yml"
+  pull_request:
+    paths:
+      - "crypto-sdk/**"
+      - ".github/workflows/crypto-sdk.yml"
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: crypto-sdk
+
+jobs:
+  quality:
+    name: Lint, typecheck, test, build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      # Install each package (crypto-engine/key-management depend on crypto-sdk via file:..).
+      - name: Install crypto-sdk
+        run: npm install
+      - name: Build crypto-sdk (produces types consumed by downstream builds)
+        run: npm run build
+      - name: Install key-management
+        run: npm install
+        working-directory: crypto-sdk/key-management
+      - name: Install crypto-engine
+        run: npm install
+        working-directory: crypto-sdk/crypto-engine
+
+      - name: Lint (whole stack)
+        run: npm run lint
+      - name: Format check (whole stack)
+        run: npm run format:check
+
+      - name: crypto-sdk — typecheck & test
+        run: npm run typecheck && npm run test
+      - name: key-management — typecheck, test, build
+        run: npm run typecheck && npm run test && npm run build
+        working-directory: crypto-sdk/key-management
+      - name: crypto-engine — typecheck, test, build
+        run: npm run typecheck && npm run test && npm run build
+        working-directory: crypto-sdk/crypto-engine
+
+  coverage:
+    name: Coverage (crypto-sdk)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run test:coverage

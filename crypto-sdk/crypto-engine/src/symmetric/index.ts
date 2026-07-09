@@ -82,7 +82,10 @@ export class SymmetricEngine {
   }
 
   /** Encrypt to an {@link EncryptedBuffer} carrying content metadata. */
-  encryptToBuffer(plaintext: Uint8Array | string, options: EncryptToBufferOptions = {}): EncryptedBuffer {
+  encryptToBuffer(
+    plaintext: Uint8Array | string,
+    options: EncryptToBufferOptions = {},
+  ): EncryptedBuffer {
     const { metadata, ...encryptOptions } = options;
     const payload = encrypt(this._key, plaintext, encryptOptions);
     const meta: ContentMetadata = { ...metadata };

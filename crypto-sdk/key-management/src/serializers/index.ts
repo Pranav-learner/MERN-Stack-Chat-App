@@ -106,9 +106,12 @@ export class KeySerializer {
     const expected = this.digest({ metadata: serialized.metadata, material: serialized.material });
     const actual = serialized.integrity?.value ?? "";
     if (!constantTimeEqual(utf8ToBytes(expected), utf8ToBytes(actual))) {
-      throw new SerializationError("Integrity check failed: serialized key is corrupted or tampered", {
-        details: { keyId: serialized.metadata?.keyId },
-      });
+      throw new SerializationError(
+        "Integrity check failed: serialized key is corrupted or tampered",
+        {
+          details: { keyId: serialized.metadata?.keyId },
+        },
+      );
     }
     const material = this.deserializeMaterial(serialized.material);
     return new ManagedKey({ metadata: serialized.metadata, material });
@@ -213,7 +216,10 @@ export class KeySerializer {
         }
         case "public": {
           const alg = toAsymmetricAlgorithm(material.algorithm);
-          return { kind: KeyMaterialKind.PUBLIC, publicKey: PublicKey.fromRaw(fromBase64(material.publicKey), alg) };
+          return {
+            kind: KeyMaterialKind.PUBLIC,
+            publicKey: PublicKey.fromRaw(fromBase64(material.publicKey), alg),
+          };
         }
         case "shared-secret":
           return {

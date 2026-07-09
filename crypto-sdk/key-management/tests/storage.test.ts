@@ -65,7 +65,9 @@ describe("MemoryStorage", () => {
     expect(await s.count()).toBe(3);
     expect(await s.count({ owner: "x" })).toBe(2);
     expect(await s.count({ type: KeyType.SESSION })).toBe(2);
-    expect((await s.list({ owner: "x", type: KeyType.IDENTITY })).map((r) => r.keyId)).toEqual(["b"]);
+    expect((await s.list({ owner: "x", type: KeyType.IDENTITY })).map((r) => r.keyId)).toEqual([
+      "b",
+    ]);
   });
 });
 

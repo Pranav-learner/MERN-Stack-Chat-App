@@ -44,7 +44,9 @@ describe("FileEncryptor — buffer mode", () => {
   });
 
   it("splits large input into multiple chunks", () => {
-    const enc = fe.encryptBuffer(randomBytes(4096), key, { metadata: { contentType: "application/octet-stream" } });
+    const enc = fe.encryptBuffer(randomBytes(4096), key, {
+      metadata: { contentType: "application/octet-stream" },
+    });
     expect(enc.chunkCount).toBe(4);
     expect(enc.metadata.originalSize).toBe(4096);
   });
@@ -64,14 +66,18 @@ describe("FileEncryptor — buffer mode", () => {
     const enc = fe.encryptBuffer(randomBytes(3000), key);
     const chunks = [...enc.chunks];
     chunks[1] = "A" + chunks[1]!.slice(1);
-    expect(() => fe.decryptBuffer(new EncryptedFile(enc.header, chunks), key)).toThrow(FileEncryptionError);
+    expect(() => fe.decryptBuffer(new EncryptedFile(enc.header, chunks), key)).toThrow(
+      FileEncryptionError,
+    );
   });
 
   it("detects reordered chunks", () => {
     const enc = fe.encryptBuffer(randomBytes(3000), key);
     const chunks = [...enc.chunks];
     [chunks[0], chunks[1]] = [chunks[1]!, chunks[0]!];
-    expect(() => fe.decryptBuffer(new EncryptedFile(enc.header, chunks), key)).toThrow(FileEncryptionError);
+    expect(() => fe.decryptBuffer(new EncryptedFile(enc.header, chunks), key)).toThrow(
+      FileEncryptionError,
+    );
   });
 
   it("detects truncation (dropped final chunk)", () => {
@@ -82,7 +88,10 @@ describe("FileEncryptor — buffer mode", () => {
   });
 
   it("encryptAttachment yields an EncryptedAttachment with metadata", () => {
-    const att = fe.encryptAttachment(randomBytes(500), key, { contentType: "image/png", name: "pic" });
+    const att = fe.encryptAttachment(randomBytes(500), key, {
+      contentType: "image/png",
+      name: "pic",
+    });
     expect(att).toBeInstanceOf(EncryptedAttachment);
     expect(att.contentType).toBe("image/png");
     expect(att.name).toBe("pic");
@@ -112,7 +121,9 @@ describe("FileEncryptor — streaming mode", () => {
   it("detects truncation of a stream", async () => {
     const frames = await collect(fe.encryptStream(fromChunks([randomBytes(2000)]), key));
     const truncated = frames.slice(0, -1); // drop the final chunk frame
-    await expect(collect(fe.decryptStream(fromChunks2(truncated), key))).rejects.toBeInstanceOf(StreamError);
+    await expect(collect(fe.decryptStream(fromChunks2(truncated), key))).rejects.toBeInstanceOf(
+      StreamError,
+    );
   });
 
   it("detects reordering of stream chunks", async () => {
@@ -120,12 +131,16 @@ describe("FileEncryptor — streaming mode", () => {
     // swap two chunk frames (indices 1 and 2 in the frame list, i.e. chunks 0 and 1)
     const reordered = [...frames];
     [reordered[1], reordered[2]] = [reordered[2]!, reordered[1]!];
-    await expect(collect(fe.decryptStream(fromChunks2(reordered), key))).rejects.toBeInstanceOf(StreamError);
+    await expect(collect(fe.decryptStream(fromChunks2(reordered), key))).rejects.toBeInstanceOf(
+      StreamError,
+    );
   });
 
   it("rejects a chunk frame before the header", async () => {
     const bad: EncryptedStreamFrame[] = [{ type: "chunk", index: 0, isFinal: true, data: "AAAA" }];
-    await expect(collect(fe.decryptStream(fromChunks2(bad), key))).rejects.toBeInstanceOf(StreamError);
+    await expect(collect(fe.decryptStream(fromChunks2(bad), key))).rejects.toBeInstanceOf(
+      StreamError,
+    );
   });
 
   it("streamed output decrypts identically to buffer output for the same key", async () => {

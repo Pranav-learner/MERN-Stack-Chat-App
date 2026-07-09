@@ -21,7 +21,7 @@ Untouched by this sprint (verified):
 - ❌ No message encryption, no handshake, no Signal protocol.
 - ❌ **No change to the Sprint 1 Crypto SDK** — not one file under `crypto-sdk/src`
   was modified. The KMS lives in its own package (`crypto-sdk/key-management/`),
-  imports the SDK as `@securechat/crypto-sdk`, and is the SDK's *only* dependency.
+  imports the SDK as `@securechat/crypto-sdk`, and is the SDK's _only_ dependency.
 
 Verify:
 
@@ -137,19 +137,19 @@ crypto-sdk/key-management/
 
 Every operation the sprint requires, and where it lives:
 
-| Operation | API | Notes |
-|---|---|---|
-| **Generate** | `generateIdentityKey`, `generateSessionKey`, `generateAgreementKey`, `storeSharedSecret`, `storeRawKey` | uses SDK CSPRNG/keygen |
-| **Store** | `storeKey` / repository `save` | validates, serializes, inserts, caches |
-| **Retrieve** | `getKey` / `findKey` / repository `findById` | cache → storage |
-| **Import** | `importKey` (JSON / base64 / binary / object) | validates + integrity-checks |
-| **Export** | `exportKey` (public-only by default) | `includePrivate` to include secrets |
-| **Replace** | `replaceKey` / repository `replace` | update existing id |
-| **Rotate** | `rotateKey` | new version + `previousKeyId`, old → `ROTATED` |
-| **Delete** | `deleteKey` / repository `delete` | storage + cache |
-| **Validate** | `validateKey` / `KeyValidator` | metadata + material + fingerprint + expiry |
-| **Expire** (metadata only) | `expireKey` / `setStatus` | never auto-transitions |
-| **Recover** (future hook) | `recoverKey` / `backupKey` | delegates to `RecoveryProvider` |
+| Operation                  | API                                                                                                     | Notes                                          |
+| -------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| **Generate**               | `generateIdentityKey`, `generateSessionKey`, `generateAgreementKey`, `storeSharedSecret`, `storeRawKey` | uses SDK CSPRNG/keygen                         |
+| **Store**                  | `storeKey` / repository `save`                                                                          | validates, serializes, inserts, caches         |
+| **Retrieve**               | `getKey` / `findKey` / repository `findById`                                                            | cache → storage                                |
+| **Import**                 | `importKey` (JSON / base64 / binary / object)                                                           | validates + integrity-checks                   |
+| **Export**                 | `exportKey` (public-only by default)                                                                    | `includePrivate` to include secrets            |
+| **Replace**                | `replaceKey` / repository `replace`                                                                     | update existing id                             |
+| **Rotate**                 | `rotateKey`                                                                                             | new version + `previousKeyId`, old → `ROTATED` |
+| **Delete**                 | `deleteKey` / repository `delete`                                                                       | storage + cache                                |
+| **Validate**               | `validateKey` / `KeyValidator`                                                                          | metadata + material + fingerprint + expiry     |
+| **Expire** (metadata only) | `expireKey` / `setStatus`                                                                               | never auto-transitions                         |
+| **Recover** (future hook)  | `recoverKey` / `backupKey`                                                                              | delegates to `RecoveryProvider`                |
 
 ```mermaid
 stateDiagram-v2
@@ -173,6 +173,7 @@ stateDiagram-v2
 ### Rotation mechanics
 
 `rotateKey(keyId, { generator? })`:
+
 1. Load the current key.
 2. Produce new material — from `options.generator(previous)`, or a
    type-appropriate default (Ed25519 for identity, AES for session, X25519 for
@@ -195,8 +196,8 @@ never on where keys live:
 interface KeyStorage {
   readonly name: string;
   readonly available: boolean;
-  set(record): Promise<void>;      // insert; DuplicateKeyError if exists
-  update(record): Promise<void>;   // replace; KeyNotFoundError if absent
+  set(record): Promise<void>; // insert; DuplicateKeyError if exists
+  update(record): Promise<void>; // replace; KeyNotFoundError if absent
   get(keyId): Promise<StoredRecord | null>;
   has(keyId): Promise<boolean>;
   delete(keyId): Promise<boolean>;
@@ -208,13 +209,13 @@ interface KeyStorage {
 
 Implementations:
 
-| Backend | State | Notes |
-|---|---|---|
-| **`MemoryStorage`** | ✅ working | `Map`-backed; deep-copies records for isolation. Default. |
-| **`SecureStorage`** | ✅ working | Decorator that encrypts the `payload` at rest with AES-256-GCM (SDK), binding `keyId` as AEAD associated data. Index fields stay cleartext for querying. |
-| **`DatabaseStorage`** | ⏳ placeholder | Conforms to the interface; every op throws `StorageFailureError`; `available = false`. |
-| **`HardwareStorage`** | ⏳ placeholder | HSM binding — future. |
-| **`CloudKmsStorage`** | ⏳ placeholder | AWS/GCP KMS / Vault — future. |
+| Backend               | State          | Notes                                                                                                                                                    |
+| --------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`MemoryStorage`**   | ✅ working     | `Map`-backed; deep-copies records for isolation. Default.                                                                                                |
+| **`SecureStorage`**   | ✅ working     | Decorator that encrypts the `payload` at rest with AES-256-GCM (SDK), binding `keyId` as AEAD associated data. Index fields stay cleartext for querying. |
+| **`DatabaseStorage`** | ⏳ placeholder | Conforms to the interface; every op throws `StorageFailureError`; `available = false`.                                                                   |
+| **`HardwareStorage`** | ⏳ placeholder | HSM binding — future.                                                                                                                                    |
+| **`CloudKmsStorage`** | ⏳ placeholder | AWS/GCP KMS / Vault — future.                                                                                                                            |
 
 Because everything is behind `KeyStorage`, adding a real database backend later is
 a new class — no consumer changes.
@@ -254,7 +255,7 @@ Each offers: `save`, `findById`, `getById`, `exists`, `replace`, `delete`,
 - **Stats:** `hits`, `misses`, `evictions`, `expirations`, `size`.
 
 Repositories/the manager read cache → storage, and populate the cache on load.
-The cache is bounded but never *loses* data — a miss falls through to storage.
+The cache is bounded but never _loses_ data — a miss falls through to storage.
 
 ---
 
@@ -263,24 +264,24 @@ The cache is bounded but never *loses* data — a miss falls through to storage.
 Every key carries a complete `KeyMetadata` so future modules never invent their
 own. `custom?: Record<string, unknown>` is the sanctioned extension point.
 
-| Field | Meaning |
-|---|---|
-| `keyId` | unique, stable id for this version |
-| `type` | `KeyType` (identity/session/shared-secret/prekey/…) |
-| `version` | rotation version, from 1 |
-| `algorithm` | `"ed25519"` / `"x25519"` / `"AES-256-GCM"` / … |
-| `purpose` | signing / key-agreement / encryption / derivation / authentication |
-| `status` | pending/active/inactive/rotated/expired/compromised/revoked/deleted |
-| `owner` | opaque caller id (NOT tied to auth) |
-| `createdAt` / `updatedAt` | ISO-8601 |
-| `expiresAt?` | ISO-8601 (metadata only) |
-| `rotationCount` | times this lineage rotated |
-| `previousKeyId?` | link to prior version |
-| `fingerprint` | hex SHA-256 of public/identifying material |
-| `label?` / `custom?` | human label / extension fields |
-| `sdkVersion` | Crypto SDK version that produced the key |
+| Field                     | Meaning                                                             |
+| ------------------------- | ------------------------------------------------------------------- |
+| `keyId`                   | unique, stable id for this version                                  |
+| `type`                    | `KeyType` (identity/session/shared-secret/prekey/…)                 |
+| `version`                 | rotation version, from 1                                            |
+| `algorithm`               | `"ed25519"` / `"x25519"` / `"AES-256-GCM"` / …                      |
+| `purpose`                 | signing / key-agreement / encryption / derivation / authentication  |
+| `status`                  | pending/active/inactive/rotated/expired/compromised/revoked/deleted |
+| `owner`                   | opaque caller id (NOT tied to auth)                                 |
+| `createdAt` / `updatedAt` | ISO-8601                                                            |
+| `expiresAt?`              | ISO-8601 (metadata only)                                            |
+| `rotationCount`           | times this lineage rotated                                          |
+| `previousKeyId?`          | link to prior version                                               |
+| `fingerprint`             | hex SHA-256 of public/identifying material                          |
+| `label?` / `custom?`      | human label / extension fields                                      |
+| `sdkVersion`              | Crypto SDK version that produced the key                            |
 
-`computeFingerprint` hashes *public* bytes for asymmetric material (safe to
+`computeFingerprint` hashes _public_ bytes for asymmetric material (safe to
 expose) and a one-way hash of secret bytes for symmetric/shared/raw.
 
 ---
@@ -317,8 +318,8 @@ object naming the offending field. It checks:
 ```
 
 - **Forms:** structured object, JSON string, base64, and raw binary — all lossless.
-- **Integrity:** a SHA-256 digest over the *canonical* (key-sorted) `{metadata,
-  material}` is embedded and re-checked (constant-time) on deserialize. Any
+- **Integrity:** a SHA-256 digest over the _canonical_ (key-sorted) `{metadata,
+material}` is embedded and re-checked (constant-time) on deserialize. Any
   tampering/corruption → `SerializationError`.
 - **Material encoding:** public keys as raw 32-byte points; private keys as PKCS#8
   DER (the SDK does not import raw private keys); symmetric/shared/raw as base64.
@@ -329,7 +330,7 @@ object naming the offending field. It checks:
 
 ## 10. Rotation framework
 
-A framework that decides *when* to rotate and tracks history — it **never rotates
+A framework that decides _when_ to rotate and tracks history — it **never rotates
 automatically and starts no timers**.
 
 - **Policies** (`RotationPolicy`): `NeverRotatePolicy`, `ManualRotationPolicy`,
@@ -428,7 +429,7 @@ graph LR
 
 **Where it will eventually touch the backend (context only — untouched now):** per
 `PROJECT_KNOWLEDGE.md`, encrypted payloads produced by later modules will ride the
-*existing, unchanged* message/socket pipeline. Key material stays inside this KMS.
+_existing, unchanged_ message/socket pipeline. Key material stays inside this KMS.
 
 ---
 

@@ -97,14 +97,14 @@ crypto-sdk/crypto-engine/
 All inherited from Sprint 1 (audited, OpenSSL-backed); the engine adds structure,
 not new primitives.
 
-| Capability | Algorithm | Where used |
-|---|---|---|
-| Authenticated symmetric | **AES-256-GCM** (AEAD) | `SymmetricEngine`, file chunks |
-| Key agreement | **X25519** (ECDH) | `AsymmetricEngine.agree` |
-| Signatures | **Ed25519** (EdDSA) | `SignatureEngine` |
-| Key derivation | **HKDF-SHA256** (+ **scrypt** for passwords) | `MasterKey` / `KeyDerivation` |
-| Hashing / checksums / fingerprints | **SHA-256** (SHA-384/512, BLAKE2b available) | integrity, fingerprints |
-| Randomness | OS **CSPRNG** | keys, nonces, salts |
+| Capability                         | Algorithm                                    | Where used                     |
+| ---------------------------------- | -------------------------------------------- | ------------------------------ |
+| Authenticated symmetric            | **AES-256-GCM** (AEAD)                       | `SymmetricEngine`, file chunks |
+| Key agreement                      | **X25519** (ECDH)                            | `AsymmetricEngine.agree`       |
+| Signatures                         | **Ed25519** (EdDSA)                          | `SignatureEngine`              |
+| Key derivation                     | **HKDF-SHA256** (+ **scrypt** for passwords) | `MasterKey` / `KeyDerivation`  |
+| Hashing / checksums / fingerprints | **SHA-256** (SHA-384/512, BLAKE2b available) | integrity, fingerprints        |
+| Randomness                         | OS **CSPRNG**                                | keys, nonces, salts            |
 
 ---
 
@@ -136,7 +136,7 @@ The file/stream construction (format v1) is the security-critical part:
   stream has a unique key, **counter nonces are safe** (no cross-stream reuse).
 - Each chunk: 12-byte **big-endian counter nonce** (the chunk index).
 - Each chunk's **AAD** binds `version | algorithm | chunkSize | streamSalt | index
-  | isFinal`, giving:
+| isFinal`, giving:
   - **reorder protection** (index bound),
   - **truncation protection** (only the last chunk has `isFinal = 1`; a cut stream
     never yields a valid terminator),
@@ -188,8 +188,8 @@ any axis yields an independent key.
 ```ts
 const kd = KeyDerivation.random("securechat");
 const enc = kd.deriveSymmetricKey("session", DerivationPurpose.ENCRYPTION);
-const mac = kd.deriveSymmetricKey("session", DerivationPurpose.MAC);      // ≠ enc
-const peer = kd.deriveSessionKey("peer-42");                              // ≠ enc/mac
+const mac = kd.deriveSymmetricKey("session", DerivationPurpose.MAC); // ≠ enc
+const peer = kd.deriveSessionKey("peer-42"); // ≠ enc/mac
 ```
 
 `MasterKey` sources: `random()`, `fromBytes()`, `fromSharedSecret()`,
@@ -203,12 +203,12 @@ agreement to a session key.
 
 Chat-agnostic, versioned, self-describing containers:
 
-| Model | Wraps | Notes |
-|---|---|---|
-| `EncryptedBuffer` | `EncryptedPayload` + `ContentMetadata` | encrypted blob |
-| `SignedPayload` | `Signature` + `SignatureMetadata` (+ optional payload) | attached/detached |
-| `EncryptedFile` | header + base64 chunk frames | chunked file |
-| `EncryptedAttachment` | `EncryptedFile` with `contentType` | attachment metadata |
+| Model                 | Wraps                                                  | Notes               |
+| --------------------- | ------------------------------------------------------ | ------------------- |
+| `EncryptedBuffer`     | `EncryptedPayload` + `ContentMetadata`                 | encrypted blob      |
+| `SignedPayload`       | `Signature` + `SignatureMetadata` (+ optional payload) | attached/detached   |
+| `EncryptedFile`       | header + base64 chunk frames                           | chunked file        |
+| `EncryptedAttachment` | `EncryptedFile` with `contentType`                     | attachment metadata |
 
 All expose `serialize()` / `static deserialize()` and `toJSON()` / `fromJSON()`.
 
@@ -253,7 +253,7 @@ throughputMiBps? }`. Convenience helpers: `benchmarkEncryption/Decryption/Signin
 Verification(payloadSize)`. `sampleMemory()` snapshots RSS/heap.
 
 Results are environment-dependent diagnostics — **not** a correctness contract;
-tests assert result *shape*, never absolute speed.
+tests assert result _shape_, never absolute speed.
 
 ---
 
@@ -261,7 +261,7 @@ tests assert result *shape*, never absolute speed.
 
 - **`SecureBuffer`** — holds sensitive bytes, returns copies, `wipe()`s on demand,
   and auto-wipes with `using` (implements `Symbol.dispose`).
-- **`analyzeRandomness` / `assertRandomness`** — a *sanity* check (length, all-equal,
+- **`analyzeRandomness` / `assertRandomness`** — a _sanity_ check (length, all-equal,
   gross low-entropy). NOT a statistical certifier; a guard against broken inputs.
 - **`toBytes` / `assertBinary`** — binary coercion/validation.
 - Re-exports `constantTimeEqual` and `wipe` from the SDK.
@@ -334,7 +334,7 @@ graph LR
 
 **Where it will eventually touch the backend (context only — untouched now):** per
 `PROJECT_KNOWLEDGE.md`, later layers pass engine-produced ciphertext/payloads
-through the *existing, unchanged* message/socket pipeline. Keys and plaintext never
+through the _existing, unchanged_ message/socket pipeline. Keys and plaintext never
 leave the crypto layers.
 
 ---

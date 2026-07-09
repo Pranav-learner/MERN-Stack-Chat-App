@@ -68,7 +68,8 @@ export class KeyValidator {
     if (typeof m.algorithm !== "string" || m.algorithm.length === 0)
       fail("algorithm is required", "algorithm", m.keyId);
     if (typeof m.owner !== "string") fail("owner is required", "owner", m.keyId);
-    if (!Number.isInteger(m.version) || m.version < 1) fail("version must be an integer >= 1", "version", m.keyId);
+    if (!Number.isInteger(m.version) || m.version < 1)
+      fail("version must be an integer >= 1", "version", m.keyId);
     if (!Number.isInteger(m.rotationCount) || m.rotationCount < 0)
       fail("rotationCount must be a non-negative integer", "rotationCount", m.keyId);
     if (typeof m.fingerprint !== "string" || m.fingerprint.length === 0)
@@ -89,16 +90,22 @@ export class KeyValidator {
       case KeyMaterialKind.SYMMETRIC:
         if (material.symmetricKey.algorithm !== SymmetricAlgorithm.AES_256_GCM)
           fail("unsupported symmetric algorithm", "material", keyId);
-        if (material.symmetricKey.length !== 32) fail("symmetric key must be 32 bytes", "material", keyId);
+        if (material.symmetricKey.length !== 32)
+          fail("symmetric key must be 32 bytes", "material", keyId);
         break;
       case KeyMaterialKind.KEYPAIR:
-        this.assertCurveKeyLength(material.keyPair.algorithm, material.keyPair.publicKey.toRaw(), keyId);
+        this.assertCurveKeyLength(
+          material.keyPair.algorithm,
+          material.keyPair.publicKey.toRaw(),
+          keyId,
+        );
         break;
       case KeyMaterialKind.PUBLIC:
         this.assertCurveKeyLength(material.publicKey.algorithm, material.publicKey.toRaw(), keyId);
         break;
       case KeyMaterialKind.SHARED_SECRET:
-        if (material.sharedSecret.length === 0) fail("shared secret must not be empty", "material", keyId);
+        if (material.sharedSecret.length === 0)
+          fail("shared secret must not be empty", "material", keyId);
         break;
       case KeyMaterialKind.RAW:
         if (material.bytes.length === 0) fail("raw material must not be empty", "material", keyId);
@@ -153,7 +160,8 @@ export class KeyValidator {
 
   private assertCurveKeyLength(algorithm: string, publicRaw: Uint8Array, keyId?: string): void {
     if (algorithm === AsymmetricAlgorithm.ED25519 || algorithm === AsymmetricAlgorithm.X25519) {
-      if (publicRaw.length !== 32) fail(`${algorithm} public key must be 32 bytes`, "material", keyId);
+      if (publicRaw.length !== 32)
+        fail(`${algorithm} public key must be 32 bytes`, "material", keyId);
       return;
     }
     fail(`unsupported asymmetric algorithm: ${algorithm}`, "material", keyId);

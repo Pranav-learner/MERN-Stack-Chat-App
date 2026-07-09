@@ -39,7 +39,9 @@ export class MigrationRegistry {
       });
     }
     if (this.byFrom.has(migration.fromVersion)) {
-      throw new MigrationError(`A migration from version ${migration.fromVersion} is already registered`);
+      throw new MigrationError(
+        `A migration from version ${migration.fromVersion} is already registered`,
+      );
     }
     this.byFrom.set(migration.fromVersion, migration);
     return this;
@@ -60,10 +62,9 @@ export class MigrationRegistry {
       try {
         current = step.migrate(current);
       } catch (cause) {
-        throw new MigrationError(
-          `Migration ${step.fromVersion} -> ${step.toVersion} failed`,
-          { cause },
-        );
+        throw new MigrationError(`Migration ${step.fromVersion} -> ${step.toVersion} failed`, {
+          cause,
+        });
       }
       if (++steps > guard) {
         throw new MigrationError("Migration exceeded maximum step count (possible cycle)");

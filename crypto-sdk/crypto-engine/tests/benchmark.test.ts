@@ -16,7 +16,12 @@ const opts = { iterations: 20, warmup: 2 };
 describe("benchmark harness", () => {
   it("benchmarkSync returns well-formed stats", () => {
     let counter = 0;
-    const r = benchmarkSync(() => { counter++; }, { ...opts, label: "noop", bytesPerOp: 100 });
+    const r = benchmarkSync(
+      () => {
+        counter++;
+      },
+      { ...opts, label: "noop", bytesPerOp: 100 },
+    );
     expect(counter).toBe(22); // warmup + iterations
     expect(r.label).toBe("noop");
     expect(r.iterations).toBe(20);
@@ -28,7 +33,12 @@ describe("benchmark harness", () => {
   });
 
   it("async benchmark works", async () => {
-    const r = await benchmark(async () => { await Promise.resolve(); }, { ...opts, label: "async" });
+    const r = await benchmark(
+      async () => {
+        await Promise.resolve();
+      },
+      { ...opts, label: "async" },
+    );
     expect(r.iterations).toBe(20);
     expect(r.opsPerSecond).toBeGreaterThan(0);
   });

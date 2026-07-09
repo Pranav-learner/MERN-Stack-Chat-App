@@ -219,7 +219,13 @@ export class KeyManager {
   ): Promise<ManagedKey> {
     const keyPair = generateKeyPair(); // X25519
     return this.storeKey(
-      this.build(type, { kind: KeyMaterialKind.KEYPAIR, keyPair }, keyPair.algorithm, KeyPurpose.KEY_AGREEMENT, options),
+      this.build(
+        type,
+        { kind: KeyMaterialKind.KEYPAIR, keyPair },
+        keyPair.algorithm,
+        KeyPurpose.KEY_AGREEMENT,
+        options,
+      ),
     );
   }
 

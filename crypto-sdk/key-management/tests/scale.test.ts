@@ -11,7 +11,10 @@ import { counterIdGenerator } from "./helpers.js";
 
 describe("scale — large numbers of keys", () => {
   it("stores, lists, counts, and retrieves 1000 keys", async () => {
-    const km = new KeyManager({ idGenerator: counterIdGenerator("s"), cache: new InMemoryKeyCache({ maxSize: 100 }) });
+    const km = new KeyManager({
+      idGenerator: counterIdGenerator("s"),
+      cache: new InMemoryKeyCache({ maxSize: 100 }),
+    });
     const N = 1000;
     const ids: string[] = [];
     for (let i = 0; i < N; i++) {

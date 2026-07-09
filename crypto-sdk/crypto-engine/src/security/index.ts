@@ -92,7 +92,11 @@ export function toBytes(input: Uint8Array | ArrayBuffer | ArrayBufferView): Uint
 }
 
 /** Assert a value is binary of an optional maximum length. @throws {ValidationError} */
-export function assertBinary(value: unknown, maxLength?: number, label = "value"): asserts value is Uint8Array {
+export function assertBinary(
+  value: unknown,
+  maxLength?: number,
+  label = "value",
+): asserts value is Uint8Array {
   if (!isUint8Array(value)) {
     throw new ValidationError(`${label} must be a Uint8Array`);
   }

@@ -17,7 +17,9 @@ describe("payload models", () => {
     expect(restored.metadata.contentType).toBe("text/plain");
     expect(restored.ciphertext).toEqual(payload.ciphertext);
     expect(() => EncryptedBuffer.deserialize("not json")).toThrow(PayloadError);
-    expect(() => EncryptedBuffer.deserialize(JSON.stringify({ format: "x" }))).toThrow(PayloadError);
+    expect(() => EncryptedBuffer.deserialize(JSON.stringify({ format: "x" }))).toThrow(
+      PayloadError,
+    );
   });
 
   it("SignedPayload serializes attached and detached forms", () => {
@@ -36,9 +38,9 @@ describe("payload models", () => {
   });
 
   it("EncryptedFile / EncryptedAttachment reject malformed headers", () => {
-    expect(() => EncryptedFile.deserialize(JSON.stringify({ header: { format: "x" }, chunks: [] }))).toThrow(
-      PayloadError,
-    );
+    expect(() =>
+      EncryptedFile.deserialize(JSON.stringify({ header: { format: "x" }, chunks: [] })),
+    ).toThrow(PayloadError);
     const goodHeader = {
       format: "securechat-encrypted-file" as const,
       version: 1,

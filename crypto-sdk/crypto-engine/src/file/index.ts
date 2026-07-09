@@ -9,11 +9,7 @@
  */
 
 import { SymmetricKey, fromBase64, toBase64 } from "@securechat/crypto-sdk";
-import type {
-  ContentMetadata,
-  EncryptedFileHeader,
-  EncryptedStreamFrame,
-} from "../types/index.js";
+import type { ContentMetadata, EncryptedFileHeader, EncryptedStreamFrame } from "../types/index.js";
 import { EncryptedAttachment, EncryptedFile } from "../payloads/index.js";
 import { FileEncryptionError, StreamError } from "../errors/index.js";
 import {
@@ -62,7 +58,11 @@ export class FileEncryptor {
   }
 
   /** Build a stream header for a new encryption. */
-  private buildHeader(streamSalt: Uint8Array, chunkSize: number, metadata: ContentMetadata): EncryptedFileHeader {
+  private buildHeader(
+    streamSalt: Uint8Array,
+    chunkSize: number,
+    metadata: ContentMetadata,
+  ): EncryptedFileHeader {
     return {
       format: "securechat-encrypted-file",
       version: STREAM_FORMAT_VERSION,
@@ -77,7 +77,11 @@ export class FileEncryptor {
    * Encrypt an in-memory buffer into an {@link EncryptedFile}.
    * @throws {FileEncryptionError}
    */
-  encryptBuffer(data: Uint8Array, key: SymmetricKey, options: FileEncryptOptions = {}): EncryptedFile {
+  encryptBuffer(
+    data: Uint8Array,
+    key: SymmetricKey,
+    options: FileEncryptOptions = {},
+  ): EncryptedFile {
     if (!(data instanceof Uint8Array)) throw new FileEncryptionError("data must be a Uint8Array");
     const chunkSize = options.chunkSize ?? this.chunkSize;
     const streamSalt = generateStreamSalt();
@@ -109,7 +113,8 @@ export class FileEncryptor {
    * @throws {FileEncryptionError} on any authentication/structure failure.
    */
   decryptBuffer(file: EncryptedFile, key: SymmetricKey): Uint8Array {
-    if (!(file instanceof EncryptedFile)) throw new FileEncryptionError("Expected an EncryptedFile");
+    if (!(file instanceof EncryptedFile))
+      throw new FileEncryptionError("Expected an EncryptedFile");
     const header = file.header;
     if (header.format !== "securechat-encrypted-file") {
       throw new FileEncryptionError("Unrecognized encrypted-file header");
@@ -145,7 +150,12 @@ export class FileEncryptor {
   encryptAttachment(
     data: Uint8Array,
     key: SymmetricKey,
-    options: { contentType: string; name?: string; chunkSize?: number; custom?: Record<string, unknown> },
+    options: {
+      contentType: string;
+      name?: string;
+      chunkSize?: number;
+      custom?: Record<string, unknown>;
+    },
   ): EncryptedAttachment {
     const metadata: ContentMetadata = { contentType: options.contentType };
     if (options.name !== undefined) metadata.name = options.name;
@@ -173,7 +183,12 @@ export class FileEncryptor {
 
     let index = 0;
     for await (const { data, isFinal } of rechunk(source, chunkSize)) {
-      yield { type: "chunk", index, isFinal, data: sealChunk(streamKey, header, index, isFinal, data) };
+      yield {
+        type: "chunk",
+        index,
+        isFinal,
+        data: sealChunk(streamKey, header, index, isFinal, data),
+      };
       index++;
     }
   }
@@ -214,7 +229,8 @@ export class FileEncryptor {
       if (frame.isFinal) sawFinal = true;
     }
     if (!header) throw new StreamError("Stream ended without a header");
-    if (!sawFinal) throw new StreamError("Stream ended before the final chunk (possible truncation)");
+    if (!sawFinal)
+      throw new StreamError("Stream ended before the final chunk (possible truncation)");
   }
 }
 

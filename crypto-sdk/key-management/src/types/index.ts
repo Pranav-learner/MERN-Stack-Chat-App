@@ -11,12 +11,7 @@
  * interprets it or ties it to authentication.
  */
 
-import type {
-  KeyPair,
-  PublicKey,
-  SymmetricKey,
-  SharedSecret,
-} from "@securechat/crypto-sdk";
+import type { KeyPair, PublicKey, SymmetricKey, SharedSecret } from "@securechat/crypto-sdk";
 
 /** The category of a managed key. Drives which repository owns it. */
 export enum KeyType {

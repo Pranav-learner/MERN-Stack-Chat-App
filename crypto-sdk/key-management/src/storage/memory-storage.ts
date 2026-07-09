@@ -28,7 +28,9 @@ export class MemoryStorage implements KeyStorage {
 
   async update(record: StoredRecord): Promise<void> {
     if (!this.records.has(record.keyId)) {
-      throw new KeyNotFoundError(`Key ${record.keyId} not found`, { details: { keyId: record.keyId } });
+      throw new KeyNotFoundError(`Key ${record.keyId} not found`, {
+        details: { keyId: record.keyId },
+      });
     }
     this.records.set(record.keyId, structuredClone(record));
   }

@@ -39,7 +39,9 @@ describe("KeyManager — generation", () => {
 
   it("stores shared secrets and raw keys", async () => {
     const km = testManager();
-    const secret = await km.storeSharedSecret(SharedSecret.fromBytes(randomBytes(32)), { owner: "u" });
+    const secret = await km.storeSharedSecret(SharedSecret.fromBytes(randomBytes(32)), {
+      owner: "u",
+    });
     expect(secret.metadata.type).toBe(KeyType.SHARED_SECRET);
     const raw = await km.storeRawKey(randomBytes(48), {
       owner: "u",
@@ -115,7 +117,9 @@ describe("KeyManager — import / export", () => {
   it("refuses public-only export of secret-only material", async () => {
     const km = testManager();
     const session = await km.generateSessionKey({ owner: "u" });
-    await expect(km.exportKey(session.keyId, { includePrivate: false })).rejects.toBeInstanceOf(ExportError);
+    await expect(km.exportKey(session.keyId, { includePrivate: false })).rejects.toBeInstanceOf(
+      ExportError,
+    );
   });
 
   it("rejects corrupted import data", async () => {
@@ -188,7 +192,9 @@ describe("KeyManager — rotation & history", () => {
 
   it("supports a custom material generator", async () => {
     const km = testManager();
-    const secret = await km.storeSharedSecret(SharedSecret.fromBytes(randomBytes(32)), { owner: "u" });
+    const secret = await km.storeSharedSecret(SharedSecret.fromBytes(randomBytes(32)), {
+      owner: "u",
+    });
     // Shared secrets have no default generator -> must supply one.
     await expect(km.rotateKey(secret.keyId)).rejects.toThrowError();
     const { current } = await km.rotateKey(secret.keyId, {
@@ -213,7 +219,9 @@ describe("KeyManager — rotation & history", () => {
     const km = testManager();
     const old = await km.generateSessionKey({ owner: "u" });
     await km.replaceKey(old.withMetadata({ createdAt: toIso(0) }));
-    const decisions = await km.evaluateRotation(new AgeBasedRotationPolicy(1000), undefined, { now: 10_000 });
+    const decisions = await km.evaluateRotation(new AgeBasedRotationPolicy(1000), undefined, {
+      now: 10_000,
+    });
     expect(decisions.find((d) => d.keyId === old.keyId)?.shouldRotate).toBe(true);
     // still present & not rotated
     expect((await km.getKey(old.keyId)).metadata.status).toBe(KeyStatus.ACTIVE);
