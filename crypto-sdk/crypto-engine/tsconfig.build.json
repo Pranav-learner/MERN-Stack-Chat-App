@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "paths": {
+      "@securechat/crypto-sdk": ["../dist/index.d.ts"]
+    }
+  },
+  "include": ["src"],
+  "exclude": ["tests", "**/*.test.ts", "node_modules", "dist"]
+}
