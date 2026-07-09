@@ -3,6 +3,9 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import { useState, useEffect } from "react";
 import { io } from "socket.io-client";
+// Layer 3 — Secure Identity: establishes local keys + registers PUBLIC keys.
+// Additive and failure-tolerant; never blocks auth or chat.
+import { ensureIdentityRegistered } from "../src/lib/identity";
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 axios.defaults.baseURL = backendUrl;
@@ -23,6 +26,8 @@ export const AuthProvider = ({ children }) => {
       if (data.success) {
         setAuthUser(data.user);
         connectSocket(data.user);
+        // Ensure this device's identity exists and its public keys are registered.
+        ensureIdentityRegistered(axios, data.user._id);
       }
     } catch (error) {
       toast.error(error.message);
@@ -40,6 +45,8 @@ export const AuthProvider = ({ children }) => {
         axios.defaults.headers.common["token"] = data.token;
         setToken(data.token);
         localStorage.setItem("token", data.token);
+        // Establish/register cryptographic identity for this user+device.
+        ensureIdentityRegistered(axios, data.userData._id);
         toast.success(data.message);
       } else {
         toast.error(data.message);
