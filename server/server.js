@@ -9,6 +9,8 @@ import groupRouter from "./routes/groupRoute.js";
 import identityRouter from "./routes/identityRoute.js";
 import deviceRouter from "./routes/deviceRoute.js";
 import trustRouter from "./routes/trustRoute.js";
+import sessionRouter from "./routes/sessionRoute.js";
+import { identityContextService, verifyToken, attachSocketIdentity } from "./integration/index.js";
 import Group from "./models/Group.model.js";
 import { Server } from "socket.io";
 
@@ -47,6 +49,18 @@ io.on("connection", async (socket) => {
     }
   }
 
+  // Layer 3 Sprint 4 — attach identity context to the socket (additive, backward
+  // compatible). Does not change presence/rooms/delivery; adds identity awareness.
+  try {
+    const identity = await attachSocketIdentity(socket, {
+      service: identityContextService,
+      verifyToken,
+    });
+    if (identity) socket.emit("identityContext", identity);
+  } catch (error) {
+    console.error("Error attaching socket identity:", error?.message);
+  }
+
   socket.on("disconnect", async () => {
     if (userId) {
       await removeUserSocket(userId);
@@ -72,6 +86,8 @@ app.use("/api/identity", identityRouter);
 app.use("/api/devices", deviceRouter);
 // Layer 3 Sprint 3 — Identity Verification & Trust Establishment (additive)
 app.use("/api/trust", trustRouter);
+// Layer 3 Sprint 4 — Identity integration: consolidated session/identity context
+app.use("/api/session", sessionRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");

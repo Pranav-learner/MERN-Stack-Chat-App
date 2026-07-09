@@ -5,17 +5,22 @@ import { useState, useEffect } from "react";
 import { io } from "socket.io-client";
 // Layer 3 — Secure Identity: establishes local keys + registers PUBLIC keys.
 // Additive and failure-tolerant; never blocks auth or chat.
-import { ensureIdentityRegistered } from "../src/lib/identity";
+import { ensureIdentityRegistered, getLocalDeviceId } from "../src/lib/identity";
 // Layer 3 Sprint 2 — Device Trust: register this device + cache its trust status.
 import { ensureDeviceRegistered } from "../src/lib/deviceTrust";
+// Layer 3 Sprint 4 — Integration: load the consolidated identity context + lifecycle.
+import {
+  loadIdentityContext,
+  clearIdentityContext,
+  contextRequiresLogout,
+} from "../src/lib/identityStore";
 
 // Establish identity, then register this device's trust (device requires an
-// identity server-side). Fully failure-tolerant; never blocks auth/chat.
-const provisionSecureIdentity = (axiosInstance, userId) => {
+// identity server-side). Returns a promise; fully failure-tolerant.
+const provisionSecureIdentity = (axiosInstance, userId) =>
   ensureIdentityRegistered(axiosInstance, userId)
     .then(() => ensureDeviceRegistered(axiosInstance, userId))
     .catch(() => {});
-};
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 axios.defaults.baseURL = backendUrl;
@@ -27,6 +32,8 @@ export const AuthProvider = ({ children }) => {
   const [authUser, setAuthUser] = useState(null);
   const [onlineUser, setOnlineUser] = useState([]);
   const [socket, setSocket] = useState(null);
+  // Layer 3 Sprint 4 — consolidated identity context (identity + devices + trust).
+  const [identityContext, setIdentityContext] = useState(null);
 
   // Check if user is authenticated and if so , set the user and connect the socket
 
@@ -36,8 +43,10 @@ export const AuthProvider = ({ children }) => {
       if (data.success) {
         setAuthUser(data.user);
         connectSocket(data.user);
-        // Ensure this device's identity + device trust are established/registered.
-        provisionSecureIdentity(axios, data.user._id);
+        // Provision identity + device trust, then load the consolidated context.
+        provisionSecureIdentity(axios, data.user._id).then(() =>
+          refreshIdentityContext(data.user._id),
+        );
       }
     } catch (error) {
       toast.error(error.message);
@@ -55,8 +64,10 @@ export const AuthProvider = ({ children }) => {
         axios.defaults.headers.common["token"] = data.token;
         setToken(data.token);
         localStorage.setItem("token", data.token);
-        // Establish/register cryptographic identity + device trust.
-        provisionSecureIdentity(axios, data.userData._id);
+        // Provision identity + device trust, then load the consolidated context.
+        provisionSecureIdentity(axios, data.userData._id).then(() =>
+          refreshIdentityContext(data.userData._id),
+        );
         toast.success(data.message);
       } else {
         toast.error(data.message);
@@ -68,13 +79,28 @@ export const AuthProvider = ({ children }) => {
 
   // Logout function to handle user logout and socket disconnection
   const logout = async () => {
+    // Layer 3 Sprint 4 — clear cached identity/session state (keeps device keys).
+    if (authUser?._id) clearIdentityContext(authUser._id);
+    setIdentityContext(null);
     localStorage.removeItem("token");
     setToken(null);
     setAuthUser(null);
     setOnlineUser([]);
     axios.defaults.headers.common["token"] = null;
     toast.success("User logged out successfully");
-    socket.disconnect();
+    socket?.disconnect();
+  };
+
+  // Layer 3 Sprint 4 — load the consolidated identity context; enforce the
+  // "device revoked → invalidate session" lifecycle rule.
+  const refreshIdentityContext = async (userId) => {
+    const ctx = await loadIdentityContext(axios, userId);
+    setIdentityContext(ctx);
+    if (contextRequiresLogout(ctx)) {
+      toast.error("This device is no longer trusted. Signing out.");
+      logout();
+    }
+    return ctx;
   };
 
   // Update Profile function to handle user profile update
@@ -93,9 +119,19 @@ export const AuthProvider = ({ children }) => {
   // Connect the socket function to handle the online updates
   const connectSocket = (userData) => {
     if (!userData || socket?.connected) return;
+    // Layer 3 Sprint 4 — tag the handshake with the JWT + device id so the socket
+    // is identity-aware and (when the token verifies) authenticated. Additive:
+    // query.userId is retained for backward compatibility.
+    const deviceId = getLocalDeviceId(userData._id) ?? undefined;
+    const jwtToken = localStorage.getItem("token") ?? undefined;
     const newSocket = io(backendUrl, {
       query: {
         userId: userData._id,
+        deviceId,
+      },
+      auth: {
+        token: jwtToken,
+        deviceId,
       },
     });
     newSocket.on("connect", () => {});
@@ -105,6 +141,14 @@ export const AuthProvider = ({ children }) => {
     });
     newSocket.on("onlineUsers", (userId) => {
       setOnlineUser(userId);
+    });
+    // Layer 3 Sprint 4 — the server pushes this socket's identity context.
+    newSocket.on("identityContext", (ctx) => {
+      setIdentityContext(ctx);
+      if (contextRequiresLogout(ctx)) {
+        toast.error("This device is no longer trusted. Signing out.");
+        logout();
+      }
     });
     setSocket(newSocket);
   };
@@ -128,6 +172,9 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     updateProfile,
+    // Layer 3 Sprint 4 — identity context + a manual refresh hook for the UI.
+    identityContext,
+    refreshIdentityContext,
   };
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

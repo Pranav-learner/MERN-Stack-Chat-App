@@ -216,3 +216,13 @@ export async function ensureIdentityRegistered(axios, userId) {
 export function getLocalFingerprint(userId) {
   return readLocal(IDENTITY_KEY(userId))?.fingerprint ?? null;
 }
+
+/**
+ * Synchronously read this user's local device id (if a device has been generated).
+ * Used to tag the WebSocket handshake with the current device.
+ * @param {string} userId
+ * @returns {string|null}
+ */
+export function getLocalDeviceId(userId) {
+  return readLocal(DEVICE_KEY(userId))?.deviceId ?? null;
+}
