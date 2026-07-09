@@ -40,6 +40,32 @@ const deviceSchema = new mongoose.Schema(
     },
     /** Last time the device was seen active. */
     lastActive: { type: Date, default: Date.now },
+
+    // --- Layer 3 · Sprint 2 (Device Trust) additive fields -------------------
+    // All optional with defaults, so Sprint 1 code and existing documents are
+    // unaffected. `status` (above) is retained for Sprint 1 compatibility;
+    // `trustStatus` is the authoritative device-trust state.
+    /** Authoritative trust state (see device-trust TrustStatus). */
+    trustStatus: {
+      type: String,
+      enum: ["trusted", "pending", "revoked", "expired", "blocked", "inactive"],
+      default: "trusted",
+      index: true,
+    },
+    /** Operating system descriptor, e.g. "Linux", "iOS 17". */
+    os: { type: String },
+    /** Client application version, e.g. "1.0.0". */
+    appVersion: { type: String },
+    /** Declared capability flags (no cryptographic capability yet). */
+    capabilities: { type: [String], default: [] },
+    /** When the device was revoked (if any). */
+    revokedAt: { type: Date },
+    /** Reason recorded at revocation time. */
+    revokedReason: { type: String },
+    /** When the device was last deactivated (if any). */
+    deactivatedAt: { type: Date },
+    /** Arbitrary public device metadata (never secret). */
+    metadata: { type: mongoose.Schema.Types.Mixed, default: {} },
   },
   { timestamps: true },
 );

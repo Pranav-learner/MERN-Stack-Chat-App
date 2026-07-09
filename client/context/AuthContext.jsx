@@ -6,6 +6,16 @@ import { io } from "socket.io-client";
 // Layer 3 — Secure Identity: establishes local keys + registers PUBLIC keys.
 // Additive and failure-tolerant; never blocks auth or chat.
 import { ensureIdentityRegistered } from "../src/lib/identity";
+// Layer 3 Sprint 2 — Device Trust: register this device + cache its trust status.
+import { ensureDeviceRegistered } from "../src/lib/deviceTrust";
+
+// Establish identity, then register this device's trust (device requires an
+// identity server-side). Fully failure-tolerant; never blocks auth/chat.
+const provisionSecureIdentity = (axiosInstance, userId) => {
+  ensureIdentityRegistered(axiosInstance, userId)
+    .then(() => ensureDeviceRegistered(axiosInstance, userId))
+    .catch(() => {});
+};
 
 const backendUrl = import.meta.env.VITE_BACKEND_URL;
 axios.defaults.baseURL = backendUrl;
@@ -26,8 +36,8 @@ export const AuthProvider = ({ children }) => {
       if (data.success) {
         setAuthUser(data.user);
         connectSocket(data.user);
-        // Ensure this device's identity exists and its public keys are registered.
-        ensureIdentityRegistered(axios, data.user._id);
+        // Ensure this device's identity + device trust are established/registered.
+        provisionSecureIdentity(axios, data.user._id);
       }
     } catch (error) {
       toast.error(error.message);
@@ -45,8 +55,8 @@ export const AuthProvider = ({ children }) => {
         axios.defaults.headers.common["token"] = data.token;
         setToken(data.token);
         localStorage.setItem("token", data.token);
-        // Establish/register cryptographic identity for this user+device.
-        ensureIdentityRegistered(axios, data.userData._id);
+        // Establish/register cryptographic identity + device trust.
+        provisionSecureIdentity(axios, data.userData._id);
         toast.success(data.message);
       } else {
         toast.error(data.message);
