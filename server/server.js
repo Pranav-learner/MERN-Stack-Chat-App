@@ -15,6 +15,7 @@ import keyAgreementRouter from "./routes/keyAgreementRoute.js";
 import secureSessionRouter from "./routes/secureSessionRoute.js";
 import sessionMessagingRouter from "./routes/sessionMessagingRoute.js";
 import secureTransportRouter from "./routes/secureTransportRoute.js";
+import sessionEvolutionRouter from "./routes/sessionEvolutionRoute.js";
 import { identityContextService, verifyToken, attachSocketIdentity } from "./integration/index.js";
 // Layer 4 · Sprint 5 — session-aware socket transport.
 import { appSessions } from "./controllers/sessionMessagingController.js";
@@ -112,6 +113,8 @@ app.use("/api/secure-session", secureSessionRouter);
 app.use("/api/messaging-session", sessionMessagingRouter);
 // Layer 4 Sprint 6 — Secure Transport: E2E relay status/metrics (server never decrypts)
 app.use("/api/secure-transport", secureTransportRouter);
+// Layer 5 Sprint 1 — Session Evolution: read-only generation/evolution awareness (no key rotation)
+app.use("/api/session-evolution", sessionEvolutionRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
