@@ -13,7 +13,11 @@ import sessionRouter from "./routes/sessionRoute.js";
 import handshakeRouter from "./routes/handshakeRoute.js";
 import keyAgreementRouter from "./routes/keyAgreementRoute.js";
 import secureSessionRouter from "./routes/secureSessionRoute.js";
+import sessionMessagingRouter from "./routes/sessionMessagingRoute.js";
 import { identityContextService, verifyToken, attachSocketIdentity } from "./integration/index.js";
+// Layer 4 · Sprint 5 — session-aware socket transport.
+import { appSessions } from "./controllers/sessionMessagingController.js";
+import { attachSocketSessionContext } from "./session-integration/index.js";
 import Group from "./models/Group.model.js";
 import { Server } from "socket.io";
 
@@ -60,6 +64,12 @@ io.on("connection", async (socket) => {
       verifyToken,
     });
     if (identity) socket.emit("identityContext", identity);
+
+    // Layer 4 Sprint 5 — attach session-aware transport context to the socket
+    // (identity + device + session status + handshake readiness). Additive; does not
+    // change presence/rooms/delivery. No transport encryption.
+    const sessionSummary = attachSocketSessionContext(socket, { appSessions });
+    socket.emit("sessionTransport", sessionSummary);
   } catch (error) {
     console.error("Error attaching socket identity:", error?.message);
   }
@@ -97,6 +107,8 @@ app.use("/api/handshake", handshakeRouter);
 app.use("/api/key-agreement", keyAgreementRouter);
 // Layer 4 Sprint 3 — Secure Sessions: tracks session lifecycle metadata; server never holds session keys
 app.use("/api/secure-session", secureSessionRouter);
+// Layer 4 Sprint 5 — Secure Session Integration: session-aware messaging status/stats
+app.use("/api/messaging-session", sessionMessagingRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");

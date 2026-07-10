@@ -25,6 +25,16 @@ const messageSchema = new mongoose.Schema(
       default: "sent",
     },
     image: { type: String },
+    // Layer 4 · Sprint 5 — Secure Session awareness (additive, PUBLIC metadata only).
+    // `secured` stays false in Layer 4; Layer 5 flips it and moves ciphertext into the
+    // message. No key bytes are ever stored here.
+    session: {
+      sessionId: { type: String, default: null },
+      keyId: { type: String, default: null },
+      secured: { type: Boolean, default: false },
+      transportMode: { type: String, enum: ["session", "fallback"], default: "fallback" },
+      fallback: { type: Boolean, default: true },
+    },
   },
   { timestamps: true }
 );

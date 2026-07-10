@@ -3,6 +3,11 @@ import Message from "../models/Message.model.js";
 import cloudinary from "../lib/cloudinary.js";
 import { io } from "../server.js";
 import { getUserSocket } from "../lib/redis.js"; // Import Redis helper
+// Layer 4 · Sprint 5 — Secure Session Integration: route sends through the session-aware
+// message pipeline (resolve → validate → prepare secure payload → transport). Additive;
+// PERMISSIVE by default so existing messaging keeps working when no session exists.
+import { messagePipeline } from "./sessionMessagingController.js";
+import { sessionMetadataOf } from "../session-integration/index.js";
 
 // Get all users except the logged in user
 export const getAllUsers = async (req, res) => {
@@ -48,30 +53,41 @@ export const sendMessage = async (req, res) => {
       const upload = await cloudinary.uploader.upload(image);
       imageUrl = upload.secure_url;
     }
-    // Create a new message
-    const newMessage = await Message.create({
-      senderId,
-      receiverId,
-      text,
-      image: imageUrl,
-      status: "sent",
+
+    // Route the send through the session-aware message pipeline. The transport
+    // persists the message (tagged with its PUBLIC session metadata) and emits it —
+    // the existing delivery behaviour, now session-aware. In Layer 5 the same pipeline
+    // will seal the payload via the encryption interceptor with zero controller change.
+    const { context, delivery: newMessage } = await messagePipeline.process({
+      sender: String(senderId),
+      recipient: String(receiverId),
+      message: { text, image: imageUrl },
+      transport: async (envelope) => {
+        const created = await Message.create({
+          senderId,
+          receiverId,
+          text: envelope.payload.text,
+          image: envelope.payload.image,
+          status: "sent",
+          session: sessionMetadataOf(envelope),
+        });
+
+        // Emit to the receiver's socket (unchanged delivery + status logic).
+        const receiverSocketId = await getUserSocket(receiverId);
+        if (receiverSocketId) {
+          io.to(receiverSocketId).emit("newMessage", created);
+          created.status = "delivered";
+          await created.save();
+          const senderSocketId = await getUserSocket(senderId);
+          if (senderSocketId) {
+            io.to(senderSocketId).emit("messageStatusUpdate", created);
+          }
+        }
+        return created;
+      },
     });
 
-    // Emit the new message to the receiver's socket
-    const receiverSocketId = await getUserSocket(receiverId); // Get from Redis
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit("newMessage", newMessage);
-      // Update status to delivered immediately if user is online
-      newMessage.status = "delivered";
-      await newMessage.save();
-      // Notify sender that message updates
-      const senderSocketId = await getUserSocket(senderId);
-      if(senderSocketId) {
-          io.to(senderSocketId).emit("messageStatusUpdate", newMessage);
-      }
-    }
-
-    res.status(201).json({ success: true, message: newMessage });
+    res.status(201).json({ success: true, message: newMessage, session: context });
   } catch (error) {
     console.log(error);
     res.status(500).json({ success: false, message: error.message });
