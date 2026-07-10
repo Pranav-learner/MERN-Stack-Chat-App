@@ -8,6 +8,9 @@ import { getUserSocket } from "../lib/redis.js"; // Import Redis helper
 // PERMISSIVE by default so existing messaging keeps working when no session exists.
 import { messagePipeline } from "./sessionMessagingController.js";
 import { sessionMetadataOf } from "../session-integration/index.js";
+// Layer 4 · Sprint 6 — Secure Transport: the server RELAYS ciphertext (never decrypts).
+import { relayManager } from "./secureTransportController.js";
+import { toStoredCiphertext } from "../secure-transport/index.js";
 
 // Get all users except the logged in user
 export const getAllUsers = async (req, res) => {
@@ -43,9 +46,43 @@ export const getAllUsers = async (req, res) => {
 
 export const sendMessage = async (req, res) => {
   try {
-    const { text, image } = req.body;
+    const { text, image, securePayload } = req.body;
     const receiverId = req.params.id;
     const senderId = req.user._id;
+
+    // === End-to-end encrypted path (Layer 4 · Sprint 6) ===================
+    // The client encrypted the message with its device-local session keys. The
+    // server is a RELAY: it validates the ciphertext's structure/binding, persists
+    // CIPHERTEXT ONLY, and delivers it. It never decrypts (it holds no keys).
+    if (securePayload) {
+      const { payload } = relayManager.relay(securePayload, { sessionId: req.body?.sessionId });
+      const stored = toStoredCiphertext(payload, { senderId, receiverId });
+      const newMessage = await Message.create({
+        senderId,
+        receiverId,
+        status: "sent",
+        secure: stored.secure,
+        session: {
+          sessionId: payload.sessionId,
+          keyId: payload.keyId,
+          secured: true,
+          transportMode: "session",
+          fallback: false,
+        },
+      });
+
+      const receiverSocketId = await getUserSocket(receiverId);
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("newMessage", newMessage); // delivers ciphertext
+        newMessage.status = "delivered";
+        await newMessage.save();
+        const senderSocketId = await getUserSocket(senderId);
+        if (senderSocketId) io.to(senderSocketId).emit("messageStatusUpdate", newMessage);
+      }
+      return res.status(201).json({ success: true, message: newMessage, encrypted: true });
+    }
+
+    // === Plaintext / session-aware fallback path (Sprint 5) ===============
     let imageUrl;
 
     // Upload image to Cloudinary
