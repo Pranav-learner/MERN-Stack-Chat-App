@@ -16,6 +16,8 @@ import secureSessionRouter from "./routes/secureSessionRoute.js";
 import sessionMessagingRouter from "./routes/sessionMessagingRoute.js";
 import secureTransportRouter from "./routes/secureTransportRoute.js";
 import sessionEvolutionRouter from "./routes/sessionEvolutionRoute.js";
+import forwardSecrecyRouter from "./routes/forwardSecrecyRoute.js";
+import automaticRekeyRouter from "./routes/automaticRekeyRoute.js";
 import { identityContextService, verifyToken, attachSocketIdentity } from "./integration/index.js";
 // Layer 4 · Sprint 5 — session-aware socket transport.
 import { appSessions } from "./controllers/sessionMessagingController.js";
@@ -115,6 +117,10 @@ app.use("/api/messaging-session", sessionMessagingRouter);
 app.use("/api/secure-transport", secureTransportRouter);
 // Layer 5 Sprint 1 — Session Evolution: read-only generation/evolution awareness (no key rotation)
 app.use("/api/session-evolution", sessionEvolutionRouter);
+// Layer 5 Sprint 2 — Forward Secrecy: generation/key-evolution metadata + audit (server never holds keys)
+app.use("/api/forward-secrecy", forwardSecrecyRouter);
+// Layer 5 Sprint 3 — Automatic Rekeying: policy config + rekey history (evolution runs device-side)
+app.use("/api/auto-rekey", automaticRekeyRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
