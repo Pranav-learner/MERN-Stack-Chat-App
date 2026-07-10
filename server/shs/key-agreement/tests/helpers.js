@@ -65,8 +65,10 @@ export function makeScenario(options = {}) {
 
   const aliceRepos = createInMemoryKeyAgreementRepositories();
   const bobRepos = createInMemoryKeyAgreementRepositories();
-  const alice = new KeyAgreementManager({ exchanges: relay.exchanges, material: aliceRepos.material, clock, idGenerator: makeIdGen("a") });
-  const bob = new KeyAgreementManager({ exchanges: relay.exchanges, material: bobRepos.material, clock, idGenerator: makeIdGen("b") });
+  // Devices share the same event bus in tests so a single capture sees every event
+  // (in production each device has its own in-process bus).
+  const alice = new KeyAgreementManager({ exchanges: relay.exchanges, material: aliceRepos.material, events, clock, idGenerator: makeIdGen("a") });
+  const bob = new KeyAgreementManager({ exchanges: relay.exchanges, material: bobRepos.material, events, clock, idGenerator: makeIdGen("b") });
 
   return { clock, events, relay, sessions, handshakeManager, server, alice, bob, aliceRepos, bobRepos, handshakeId };
 }
