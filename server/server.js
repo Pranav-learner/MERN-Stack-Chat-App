@@ -12,6 +12,7 @@ import trustRouter from "./routes/trustRoute.js";
 import sessionRouter from "./routes/sessionRoute.js";
 import handshakeRouter from "./routes/handshakeRoute.js";
 import keyAgreementRouter from "./routes/keyAgreementRoute.js";
+import secureSessionRouter from "./routes/secureSessionRoute.js";
 import { identityContextService, verifyToken, attachSocketIdentity } from "./integration/index.js";
 import Group from "./models/Group.model.js";
 import { Server } from "socket.io";
@@ -94,6 +95,8 @@ app.use("/api/session", sessionRouter);
 app.use("/api/handshake", handshakeRouter);
 // Layer 4 Sprint 2 — Secure Key Agreement: relays public ephemeral keys; server never sees the shared secret
 app.use("/api/key-agreement", keyAgreementRouter);
+// Layer 4 Sprint 3 — Secure Sessions: tracks session lifecycle metadata; server never holds session keys
+app.use("/api/secure-session", secureSessionRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
