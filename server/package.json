@@ -9,7 +9,7 @@
   "scripts": {
     "server": "nodemon server.js",
     "start": "node server.js",
-    "test": "node --test \"identity/tests/**/*.test.js\" \"device-trust/tests/**/*.test.js\" \"trust/tests/**/*.test.js\" \"integration/tests/**/*.test.js\""
+    "test": "node --test \"identity/tests/**/*.test.js\" \"device-trust/tests/**/*.test.js\" \"trust/tests/**/*.test.js\" \"integration/tests/**/*.test.js\" \"shs/tests/**/*.test.js\""
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
