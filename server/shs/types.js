@@ -24,8 +24,15 @@
  * - `WAITING`      — request emitted; awaiting the responder.
  * - `NEGOTIATING`  — both parties present; negotiating version/capabilities.
  *
+ * Active crypto states (Layer 4 · Sprint 2 — Secure Key Agreement; additive):
+ * - `GENERATING_EPHEMERAL_KEYS` — a party is minting its fresh ephemeral X25519 pair.
+ * - `WAITING_FOR_PEER_KEY`      — own ephemeral public key published; awaiting the peer's.
+ * - `DERIVING_SHARED_SECRET`    — both ephemeral public keys present; deriving locally.
+ * - `SHARED_SECRET_ESTABLISHED` — both sides derived the secret; commitments matched.
+ *
  * Terminal states:
  * - `COMPLETED`    — protocol handshake concluded successfully (no keys in S1).
+ * - `CRYPTOGRAPHICALLY_COMPLETE` — key agreement done; a shared secret exists (S2).
  * - `FAILED`       — a protocol/validation error ended the handshake.
  * - `CANCELLED`    — the initiator cancelled before completion.
  * - `EXPIRED`      — the session passed its expiry deadline.
@@ -39,7 +46,13 @@ export const HandshakeState = Object.freeze({
   INITIALIZED: "initialized",
   WAITING: "waiting",
   NEGOTIATING: "negotiating",
+  // Layer 4 · Sprint 2 — Secure Key Agreement (crypto sub-lifecycle).
+  GENERATING_EPHEMERAL_KEYS: "generating_ephemeral_keys",
+  WAITING_FOR_PEER_KEY: "waiting_for_peer_key",
+  DERIVING_SHARED_SECRET: "deriving_shared_secret",
+  SHARED_SECRET_ESTABLISHED: "shared_secret_established",
   COMPLETED: "completed",
+  CRYPTOGRAPHICALLY_COMPLETE: "cryptographically_complete",
   FAILED: "failed",
   CANCELLED: "cancelled",
   EXPIRED: "expired",
@@ -54,7 +67,12 @@ export const ALL_HANDSHAKE_STATES = Object.freeze([
   HandshakeState.INITIALIZED,
   HandshakeState.WAITING,
   HandshakeState.NEGOTIATING,
+  HandshakeState.GENERATING_EPHEMERAL_KEYS,
+  HandshakeState.WAITING_FOR_PEER_KEY,
+  HandshakeState.DERIVING_SHARED_SECRET,
+  HandshakeState.SHARED_SECRET_ESTABLISHED,
   HandshakeState.COMPLETED,
+  HandshakeState.CRYPTOGRAPHICALLY_COMPLETE,
   HandshakeState.FAILED,
   HandshakeState.CANCELLED,
   HandshakeState.EXPIRED,
@@ -69,11 +87,24 @@ export const ACTIVE_HANDSHAKE_STATES = Object.freeze([
   HandshakeState.INITIALIZED,
   HandshakeState.WAITING,
   HandshakeState.NEGOTIATING,
+  HandshakeState.GENERATING_EPHEMERAL_KEYS,
+  HandshakeState.WAITING_FOR_PEER_KEY,
+  HandshakeState.DERIVING_SHARED_SECRET,
+  HandshakeState.SHARED_SECRET_ESTABLISHED,
+]);
+
+/** The Sprint 2 crypto sub-lifecycle states (subset of the active states). */
+export const KEY_AGREEMENT_STATES = Object.freeze([
+  HandshakeState.GENERATING_EPHEMERAL_KEYS,
+  HandshakeState.WAITING_FOR_PEER_KEY,
+  HandshakeState.DERIVING_SHARED_SECRET,
+  HandshakeState.SHARED_SECRET_ESTABLISHED,
 ]);
 
 /** Terminal states — no further transitions are allowed. */
 export const TERMINAL_HANDSHAKE_STATES = Object.freeze([
   HandshakeState.COMPLETED,
+  HandshakeState.CRYPTOGRAPHICALLY_COMPLETE,
   HandshakeState.FAILED,
   HandshakeState.CANCELLED,
   HandshakeState.EXPIRED,

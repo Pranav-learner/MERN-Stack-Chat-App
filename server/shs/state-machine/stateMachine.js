@@ -86,7 +86,44 @@ export const ALLOWED_TRANSITIONS = Object.freeze({
   ],
   [HandshakeState.NEGOTIATING]: [
     HandshakeState.COMPLETED,
+    // Layer 4 · Sprint 2 — enter the key-agreement sub-lifecycle.
+    HandshakeState.GENERATING_EPHEMERAL_KEYS,
     HandshakeState.REJECTED,
+    HandshakeState.FAILED,
+    HandshakeState.CANCELLED,
+    HandshakeState.TIMED_OUT,
+    HandshakeState.EXPIRED,
+    HandshakeState.ABORTED,
+  ],
+  // Layer 4 · Sprint 2 — Secure Key Agreement crypto sub-lifecycle (additive).
+  // Every crypto step can also fail / cancel / time out / expire / abort.
+  [HandshakeState.GENERATING_EPHEMERAL_KEYS]: [
+    HandshakeState.WAITING_FOR_PEER_KEY,
+    HandshakeState.FAILED,
+    HandshakeState.CANCELLED,
+    HandshakeState.TIMED_OUT,
+    HandshakeState.EXPIRED,
+    HandshakeState.ABORTED,
+  ],
+  [HandshakeState.WAITING_FOR_PEER_KEY]: [
+    HandshakeState.DERIVING_SHARED_SECRET,
+    HandshakeState.REJECTED,
+    HandshakeState.FAILED,
+    HandshakeState.CANCELLED,
+    HandshakeState.TIMED_OUT,
+    HandshakeState.EXPIRED,
+    HandshakeState.ABORTED,
+  ],
+  [HandshakeState.DERIVING_SHARED_SECRET]: [
+    HandshakeState.SHARED_SECRET_ESTABLISHED,
+    HandshakeState.FAILED,
+    HandshakeState.CANCELLED,
+    HandshakeState.TIMED_OUT,
+    HandshakeState.EXPIRED,
+    HandshakeState.ABORTED,
+  ],
+  [HandshakeState.SHARED_SECRET_ESTABLISHED]: [
+    HandshakeState.CRYPTOGRAPHICALLY_COMPLETE,
     HandshakeState.FAILED,
     HandshakeState.CANCELLED,
     HandshakeState.TIMED_OUT,
@@ -95,6 +132,7 @@ export const ALLOWED_TRANSITIONS = Object.freeze({
   ],
   // Terminal states — no outgoing transitions.
   [HandshakeState.COMPLETED]: [],
+  [HandshakeState.CRYPTOGRAPHICALLY_COMPLETE]: [],
   [HandshakeState.FAILED]: [],
   [HandshakeState.CANCELLED]: [],
   [HandshakeState.EXPIRED]: [],

@@ -38,7 +38,13 @@ const handshakeSessionSchema = new mongoose.Schema(
         "initialized",
         "waiting",
         "negotiating",
+        // Layer 4 · Sprint 2 — Secure Key Agreement crypto sub-lifecycle.
+        "generating_ephemeral_keys",
+        "waiting_for_peer_key",
+        "deriving_shared_secret",
+        "shared_secret_established",
         "completed",
+        "cryptographically_complete",
         "failed",
         "cancelled",
         "expired",
