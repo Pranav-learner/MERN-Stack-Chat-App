@@ -9,7 +9,7 @@
   "scripts": {
     "server": "nodemon server.js",
     "start": "node server.js",
-    "test": "node --test \"identity/tests/**/*.test.js\" \"device-trust/tests/**/*.test.js\" \"trust/tests/**/*.test.js\" \"integration/tests/**/*.test.js\" \"shs/tests/**/*.test.js\" \"shs/key-agreement/tests/**/*.test.js\" \"shs/session/tests/**/*.test.js\" \"shs/hardening/tests/**/*.test.js\" \"session-integration/tests/**/*.test.js\" \"secure-transport/tests/**/*.test.js\" \"session-evolution/tests/**/*.test.js\" \"forward-secrecy/tests/**/*.test.js\" \"evolution-policy/tests/**/*.test.js\" \"key-hierarchy/tests/**/*.test.js\""
+    "test": "node --test \"identity/tests/**/*.test.js\" \"device-trust/tests/**/*.test.js\" \"trust/tests/**/*.test.js\" \"integration/tests/**/*.test.js\" \"shs/tests/**/*.test.js\" \"shs/key-agreement/tests/**/*.test.js\" \"shs/session/tests/**/*.test.js\" \"shs/hardening/tests/**/*.test.js\" \"session-integration/tests/**/*.test.js\" \"secure-transport/tests/**/*.test.js\" \"session-evolution/tests/**/*.test.js\" \"forward-secrecy/tests/**/*.test.js\" \"evolution-policy/tests/**/*.test.js\" \"key-hierarchy/tests/**/*.test.js\" \"message-keys/tests/**/*.test.js\""
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
