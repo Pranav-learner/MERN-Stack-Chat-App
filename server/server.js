@@ -29,6 +29,7 @@ import endpointSelectionRouter from "./routes/endpointSelectionRoute.js";
 import networkingHardeningRouter from "./routes/networkingHardeningRoute.js";
 import networkDiscoveryRouter from "./routes/networkDiscoveryRoute.js";
 import networkReliabilityRouter from "./routes/networkReliabilityRoute.js";
+import dataPlaneRouter from "./routes/dataPlaneRoute.js";
 import { reliabilityHeartbeatMonitor } from "./controllers/networkReliabilityController.js";
 import { presenceService, presenceEvents, heartbeatMonitor } from "./controllers/presenceController.js";
 import { PresenceEventType } from "./presence/events/events.js";
@@ -225,6 +226,12 @@ app.use("/api/network-discovery", networkDiscoveryRouter);
 // Layer 7 Sprint 3 — Network Reliability: makes active connections reliable (recovery, health,
 // retry policies, observability). Carries NO application data (P2P messaging/media = Layer 8).
 app.use("/api/network-reliability", networkReliabilityRouter);
+
+// Layer 8 Sprint 1 — Reliable P2P Messaging (data plane): transports ALREADY-ENCRYPTED application
+// messages with guaranteed-delivery semantics (reliable delivery, ordering, ACKs, retransmission,
+// duplicate detection). The server is a BLIND store-and-forward relay (ciphertext only, never
+// decrypts); the messaging engine runs peer-to-peer on the client. NO file transfer/media (Sprint 2).
+app.use("/api/data-plane", dataPlaneRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
