@@ -21,6 +21,7 @@ import automaticRekeyRouter from "./routes/automaticRekeyRoute.js";
 import keyHierarchyRouter from "./routes/keyHierarchyRoute.js";
 import messageKeyRouter from "./routes/messageKeyRoute.js";
 import cryptoHardeningRouter from "./routes/cryptoHardeningRoute.js";
+import discoveryRouter from "./routes/discoveryRoute.js";
 import { identityContextService, verifyToken, attachSocketIdentity } from "./integration/index.js";
 // Layer 4 · Sprint 5 — session-aware socket transport.
 import { appSessions } from "./controllers/sessionMessagingController.js";
@@ -130,6 +131,9 @@ app.use("/api/key-hierarchy", keyHierarchyRouter);
 app.use("/api/message-keys", messageKeyRouter);
 // Layer 5 Sprint 6 — Cryptographic Hardening: metrics, security alerts, protocol freeze, replay status
 app.use("/api/crypto-hardening", cryptoHardeningRouter);
+// Layer 6 Sprint 1 — Peer Discovery: transport-independent control plane (who a peer is + which
+// devices they have). No presence/capability/NAT/transport; returns PUBLIC metadata only.
+app.use("/api/discovery", discoveryRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
