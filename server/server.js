@@ -34,6 +34,7 @@ import transportEngineRouter from "./routes/transportEngineRoute.js";
 import transportReliabilityRouter from "./routes/transportReliabilityRoute.js";
 import { stallMonitor } from "./controllers/transportReliabilityController.js";
 import synchronizationRouter from "./routes/synchronizationRoute.js";
+import replicationRouter from "./routes/replicationRoute.js";
 import { reliabilityHeartbeatMonitor } from "./controllers/networkReliabilityController.js";
 import { presenceService, presenceEvents, heartbeatMonitor } from "./controllers/presenceController.js";
 import { PresenceEventType } from "./presence/events/events.js";
@@ -257,6 +258,13 @@ app.use("/api/transport-reliability", transportReliabilityRouter);
 // resumable sessions. Reasons over VERSION METADATA only (no plaintext/keys); moves no bytes (Layer 8
 // does). NO conflict resolution / merge / consensus / group sync — that is Sprint 2.
 app.use("/api/synchronization", synchronizationRouter);
+
+// Layer 9 Sprint 2 — State Replication & Conflict Resolution: every device is a secure encrypted
+// REPLICA; keeps replicas eventually consistent by comparing them, resolving conflicts (LWW / server-
+// authority / merge / custom), applying deterministic merges (read-receipt union, delivery max-state,
+// attachment/metadata field-merge), replicating deltas (replay-protected), and resuming interrupted
+// sync. Reasons over version metadata only (no plaintext/keys). NO consensus / CRDTs / vector clocks.
+app.use("/api/replication", replicationRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
