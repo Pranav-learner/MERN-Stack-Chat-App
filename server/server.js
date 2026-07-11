@@ -24,6 +24,7 @@ import cryptoHardeningRouter from "./routes/cryptoHardeningRoute.js";
 import discoveryRouter from "./routes/discoveryRoute.js";
 import presenceRouter from "./routes/presenceRoute.js";
 import capabilityRouter from "./routes/capabilityRoute.js";
+import pdpRouter from "./routes/pdpRoute.js";
 import { presenceService, presenceEvents, heartbeatMonitor } from "./controllers/presenceController.js";
 import { PresenceEventType } from "./presence/events/events.js";
 import { identityContextService, verifyToken, attachSocketIdentity } from "./integration/index.js";
@@ -204,6 +205,9 @@ app.use("/api/presence", presenceRouter);
 // Layer 6 Sprint 3 — Capability Exchange: how two devices can communicate (compatibility +
 // preferred transport). Determines a strategy only; NO NAT/ICE/WebRTC/connection establishment.
 app.use("/api/capabilities", capabilityRouter);
+// Layer 6 Sprint 4 — Peer Discovery Protocol: unifies discovery+presence+capabilities into one
+// workflow producing validated Connection Plans (WHO + HOW). NO connection establishment (Layer 7).
+app.use("/api/pdp", pdpRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
