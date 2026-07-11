@@ -30,6 +30,7 @@ import networkingHardeningRouter from "./routes/networkingHardeningRoute.js";
 import networkDiscoveryRouter from "./routes/networkDiscoveryRoute.js";
 import networkReliabilityRouter from "./routes/networkReliabilityRoute.js";
 import dataPlaneRouter from "./routes/dataPlaneRoute.js";
+import transportEngineRouter from "./routes/transportEngineRoute.js";
 import { reliabilityHeartbeatMonitor } from "./controllers/networkReliabilityController.js";
 import { presenceService, presenceEvents, heartbeatMonitor } from "./controllers/presenceController.js";
 import { PresenceEventType } from "./presence/events/events.js";
@@ -232,6 +233,13 @@ app.use("/api/network-reliability", networkReliabilityRouter);
 // duplicate detection). The server is a BLIND store-and-forward relay (ciphertext only, never
 // decrypts); the messaging engine runs peer-to-peer on the client. NO file transfer/media (Sprint 2).
 app.use("/api/data-plane", dataPlaneRouter);
+
+// Layer 8 Sprint 2 — Large Payload Transport Engine: efficiently transports large ENCRYPTED payloads
+// (files, images, videos, voice notes, documents, binary) via fragmentation, flow control,
+// backpressure, multiplexing, priority scheduling, and reassembly — on top of the reliable messaging
+// data plane. The server is a BLIND chunk relay (opaque ciphertext only, never decrypts); the engine
+// runs peer-to-peer on the client. NO live media (voice/video calls, streaming) — that is Layer 11.
+app.use("/api/transport-engine", transportEngineRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
