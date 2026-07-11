@@ -28,6 +28,8 @@ import pdpRouter from "./routes/pdpRoute.js";
 import endpointSelectionRouter from "./routes/endpointSelectionRoute.js";
 import networkingHardeningRouter from "./routes/networkingHardeningRoute.js";
 import networkDiscoveryRouter from "./routes/networkDiscoveryRoute.js";
+import networkReliabilityRouter from "./routes/networkReliabilityRoute.js";
+import { reliabilityHeartbeatMonitor } from "./controllers/networkReliabilityController.js";
 import { presenceService, presenceEvents, heartbeatMonitor } from "./controllers/presenceController.js";
 import { PresenceEventType } from "./presence/events/events.js";
 import { identityContextService, verifyToken, attachSocketIdentity } from "./integration/index.js";
@@ -220,6 +222,9 @@ app.use("/api/networking-hardening", networkingHardeningRouter);
 // Layer 7 Sprint 1 — Network Discovery: discovers each device's network environment (interfaces,
 // NAT via STUN) → Network Profiles + ICE-style candidates. NO ICE checks/TURN/WebRTC/connection.
 app.use("/api/network-discovery", networkDiscoveryRouter);
+// Layer 7 Sprint 3 — Network Reliability: makes active connections reliable (recovery, health,
+// retry policies, observability). Carries NO application data (P2P messaging/media = Layer 8).
+app.use("/api/network-reliability", networkReliabilityRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
@@ -230,6 +235,11 @@ console.log("MongoDB connection attempt finished.");
 // unref'd so it never keeps the process alive on its own.
 heartbeatMonitor.start();
 console.log("Presence heartbeat monitor started.");
+
+// Layer 7 Sprint 3 — start the connection reliability heartbeat monitor (periodic timeout sweeps →
+// automatic recovery). Timer is unref'd.
+reliabilityHeartbeatMonitor.start();
+console.log("Connection reliability heartbeat monitor started.");
 
 const PORT = process.env.PORT || 5000;
 console.log(`Checking PORT: ${PORT}`);
