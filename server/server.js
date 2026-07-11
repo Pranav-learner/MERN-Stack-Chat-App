@@ -23,6 +23,7 @@ import messageKeyRouter from "./routes/messageKeyRoute.js";
 import cryptoHardeningRouter from "./routes/cryptoHardeningRoute.js";
 import discoveryRouter from "./routes/discoveryRoute.js";
 import presenceRouter from "./routes/presenceRoute.js";
+import capabilityRouter from "./routes/capabilityRoute.js";
 import { presenceService, presenceEvents, heartbeatMonitor } from "./controllers/presenceController.js";
 import { PresenceEventType } from "./presence/events/events.js";
 import { identityContextService, verifyToken, attachSocketIdentity } from "./integration/index.js";
@@ -200,6 +201,9 @@ app.use("/api/discovery", discoveryRouter);
 // Layer 6 Sprint 2 — Presence: real-time device availability (which devices are reachable). No
 // capability/NAT/transport; returns PUBLIC presence + advertisement metadata only.
 app.use("/api/presence", presenceRouter);
+// Layer 6 Sprint 3 — Capability Exchange: how two devices can communicate (compatibility +
+// preferred transport). Determines a strategy only; NO NAT/ICE/WebRTC/connection establishment.
+app.use("/api/capabilities", capabilityRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
