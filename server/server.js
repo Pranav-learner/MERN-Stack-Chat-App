@@ -35,6 +35,8 @@ import transportReliabilityRouter from "./routes/transportReliabilityRoute.js";
 import { stallMonitor } from "./controllers/transportReliabilityController.js";
 import synchronizationRouter from "./routes/synchronizationRoute.js";
 import replicationRouter from "./routes/replicationRoute.js";
+import syncReliabilityRouter from "./routes/syncReliabilityRoute.js";
+import { stallMonitor as syncStallMonitor } from "./controllers/syncReliabilityController.js";
 import { reliabilityHeartbeatMonitor } from "./controllers/networkReliabilityController.js";
 import { presenceService, presenceEvents, heartbeatMonitor } from "./controllers/presenceController.js";
 import { PresenceEventType } from "./presence/events/events.js";
@@ -266,6 +268,13 @@ app.use("/api/synchronization", synchronizationRouter);
 // sync. Reasons over version metadata only (no plaintext/keys). NO consensus / CRDTs / vector clocks.
 app.use("/api/replication", replicationRouter);
 
+// Layer 9 Sprint 3 — Synchronization Reliability & Production Hardening: makes synchronization reliable
+// (interrupted-sync/device-crash/app-restart recovery, resume-from-checkpoint, health monitoring,
+// replica-drift tracking, retry policies, observability, security validation, protocol freeze). Carries
+// NO content/keys; recovery preserves replica consistency. Completes Layer 9; Layer 10 (secure group
+// communication) builds on the frozen sync interfaces.
+app.use("/api/sync-reliability", syncReliabilityRouter);
+
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
 await connectDB();
@@ -280,6 +289,10 @@ console.log("Presence heartbeat monitor started.");
 // timer is unref'd so it never keeps the process alive on its own.
 stallMonitor.start();
 console.log("Transport reliability stall monitor started.");
+
+// Layer 9 Sprint 3 — start the synchronization stall monitor (no-progress sweeps → recovery). Unref'd.
+syncStallMonitor.start();
+console.log("Synchronization reliability stall monitor started.");
 
 // Layer 7 Sprint 3 — start the connection reliability heartbeat monitor (periodic timeout sweeps →
 // automatic recovery). Timer is unref'd.
