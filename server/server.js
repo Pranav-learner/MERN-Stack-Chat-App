@@ -27,6 +27,7 @@ import capabilityRouter from "./routes/capabilityRoute.js";
 import pdpRouter from "./routes/pdpRoute.js";
 import endpointSelectionRouter from "./routes/endpointSelectionRoute.js";
 import networkingHardeningRouter from "./routes/networkingHardeningRoute.js";
+import networkDiscoveryRouter from "./routes/networkDiscoveryRoute.js";
 import { presenceService, presenceEvents, heartbeatMonitor } from "./controllers/presenceController.js";
 import { PresenceEventType } from "./presence/events/events.js";
 import { identityContextService, verifyToken, attachSocketIdentity } from "./integration/index.js";
@@ -216,6 +217,9 @@ app.use("/api/endpoint-selection", endpointSelectionRouter);
 // Layer 6 Sprint 6 — Production Networking Hardening: read-only observability (health, metrics,
 // Prometheus, alerts), frozen protocol manifest + API security audit for the whole control plane.
 app.use("/api/networking-hardening", networkingHardeningRouter);
+// Layer 7 Sprint 1 — Network Discovery: discovers each device's network environment (interfaces,
+// NAT via STUN) → Network Profiles + ICE-style candidates. NO ICE checks/TURN/WebRTC/connection.
+app.use("/api/network-discovery", networkDiscoveryRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
