@@ -22,6 +22,9 @@ import keyHierarchyRouter from "./routes/keyHierarchyRoute.js";
 import messageKeyRouter from "./routes/messageKeyRoute.js";
 import cryptoHardeningRouter from "./routes/cryptoHardeningRoute.js";
 import discoveryRouter from "./routes/discoveryRoute.js";
+import presenceRouter from "./routes/presenceRoute.js";
+import { presenceService, presenceEvents, heartbeatMonitor } from "./controllers/presenceController.js";
+import { PresenceEventType } from "./presence/events/events.js";
 import { identityContextService, verifyToken, attachSocketIdentity } from "./integration/index.js";
 // Layer 4 · Sprint 5 — session-aware socket transport.
 import { appSessions } from "./controllers/sessionMessagingController.js";
@@ -82,14 +85,74 @@ io.on("connection", async (socket) => {
     console.error("Error attaching socket identity:", error?.message);
   }
 
+  // Layer 6 Sprint 2 — real-time presence. If the client supplies a stable deviceId in the
+  // handshake, register/refresh its presence for the life of the socket. Additive + defensive:
+  // any failure here never affects existing presence/rooms/delivery. Answers "reachable?" only —
+  // NO transport negotiation.
+  const deviceId = socket.handshake.query.deviceId;
+  if (userId && deviceId) {
+    try {
+      const record = await presenceService.onConnect({
+        userId,
+        deviceId,
+        platform: socket.handshake.query.platform,
+        softwareVersion: socket.handshake.query.appVersion,
+      });
+      socket.emit("presenceSelf", record);
+    } catch (error) {
+      console.error("Error registering presence:", error?.message);
+    }
+
+    // Client-driven heartbeat over the socket (cheaper than the REST heartbeat).
+    socket.on("presence:heartbeat", async () => {
+      try {
+        await presenceService.onHeartbeat({ userId, deviceId });
+      } catch (error) {
+        console.error("Error on presence heartbeat:", error?.message);
+      }
+    });
+
+    // Client-driven status change (online / away / busy / invisible).
+    socket.on("presence:status", async (payload) => {
+      try {
+        const record = await presenceService.manager.setDeviceStatus(userId, deviceId, payload?.status, { actingUser: userId });
+        socket.emit("presenceSelf", record);
+      } catch (error) {
+        console.error("Error on presence status update:", error?.message);
+      }
+    });
+  }
+
   socket.on("disconnect", async () => {
     if (userId) {
       await removeUserSocket(userId);
       const onlineUsers = await getOnlineUsers();
       io.emit("onlineUsers", onlineUsers);
+
+      // Layer 6 Sprint 2 — mark the device disconnected (a later heartbeat recovers it, or the
+      // sweep expires it). Defensive; never blocks the existing disconnect flow.
+      if (deviceId) {
+        try {
+          await presenceService.onDisconnect({ userId, deviceId, reason: "socket-closed" });
+        } catch (error) {
+          console.error("Error marking presence disconnected:", error?.message);
+        }
+      }
     }
   });
 });
+
+// Layer 6 Sprint 2 — broadcast presence transitions so connected clients can update their UI in
+// real time. Additive: a separate channel from the existing `onlineUsers` event.
+for (const type of [PresenceEventType.ONLINE, PresenceEventType.OFFLINE, PresenceEventType.EXPIRED, PresenceEventType.RECOVERED, PresenceEventType.UPDATED]) {
+  presenceEvents.on(type, (event) => {
+    try {
+      io.emit("presenceChanged", { type: event.type, userId: event.userId, deviceId: event.deviceId, status: event.status });
+    } catch {
+      // best-effort broadcast
+    }
+  });
+}
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
@@ -134,11 +197,19 @@ app.use("/api/crypto-hardening", cryptoHardeningRouter);
 // Layer 6 Sprint 1 — Peer Discovery: transport-independent control plane (who a peer is + which
 // devices they have). No presence/capability/NAT/transport; returns PUBLIC metadata only.
 app.use("/api/discovery", discoveryRouter);
+// Layer 6 Sprint 2 — Presence: real-time device availability (which devices are reachable). No
+// capability/NAT/transport; returns PUBLIC presence + advertisement metadata only.
+app.use("/api/presence", presenceRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
 await connectDB();
 console.log("MongoDB connection attempt finished.");
+
+// Layer 6 Sprint 2 — start the presence heartbeat monitor (periodic expiry sweeps). The timer is
+// unref'd so it never keeps the process alive on its own.
+heartbeatMonitor.start();
+console.log("Presence heartbeat monitor started.");
 
 const PORT = process.env.PORT || 5000;
 console.log(`Checking PORT: ${PORT}`);
