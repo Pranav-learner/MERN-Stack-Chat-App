@@ -33,6 +33,7 @@ import dataPlaneRouter from "./routes/dataPlaneRoute.js";
 import transportEngineRouter from "./routes/transportEngineRoute.js";
 import transportReliabilityRouter from "./routes/transportReliabilityRoute.js";
 import { stallMonitor } from "./controllers/transportReliabilityController.js";
+import synchronizationRouter from "./routes/synchronizationRoute.js";
 import { reliabilityHeartbeatMonitor } from "./controllers/networkReliabilityController.js";
 import { presenceService, presenceEvents, heartbeatMonitor } from "./controllers/presenceController.js";
 import { PresenceEventType } from "./presence/events/events.js";
@@ -249,6 +250,13 @@ app.use("/api/transport-engine", transportEngineRouter);
 // preserves the transfer checkpoint + crypto session. Completes Layer 8; Layer 9 (offline sync) builds
 // on the frozen Data-Plane interfaces.
 app.use("/api/transport-reliability", transportReliabilityRouter);
+
+// Layer 9 Sprint 1 — Offline Synchronization Engine: securely synchronizes ENCRYPTED application state
+// (messages, conversations, delivery, read receipts, attachment/transfer/device metadata) across a
+// user's devices by computing deltas (what's missing) + deterministic plans (how to sync) and running
+// resumable sessions. Reasons over VERSION METADATA only (no plaintext/keys); moves no bytes (Layer 8
+// does). NO conflict resolution / merge / consensus / group sync — that is Sprint 2.
+app.use("/api/synchronization", synchronizationRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
