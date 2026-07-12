@@ -1123,4 +1123,61 @@ graph TD
 
 ---
 
+## SECTION 25 - SKILLS IT DEMONSTRATES
+
+
+### Backend
+- REST APIs
+- WebSockets
+- Authentication
+- Authorization
+- File uploads
+- Group management
+- Notifications
+- Media handling
+
+###Distributed Systems
+- P2P networking
+- State replication
+- Synchronization
+- Conflict resolution
+- Reliable messaging
+- Adaptive routing
+- QoS
+- Scheduling
+- Recovery
+- Retry
+- Resource management
+- Communication orchestration
+
+### Security
+- End-to-End Encryption
+- Secure Handshake (SHS)
+- Identity verification
+- Device trust
+- Forward secrecy
+- Key hierarchy
+- Per-message encryption
+- Group key management
+
+### Networking
+- NAT traversal
+- STUN
+- TURN
+- Peer discovery
+- Presence
+- Capability negotiation
+
+### Production Engineering
+- Health monitoring
+- Recovery
+- Retry policies
+- Circuit breakers
+- Bulkheads
+- Observability
+- API versioning
+- Documentation
+- Testing
+- Architecture freeze
+---
 *End of PROJECT_KNOWLEDGE.md — descriptive baseline only.*
