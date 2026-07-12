@@ -38,6 +38,7 @@ import replicationRouter from "./routes/replicationRoute.js";
 import syncReliabilityRouter from "./routes/syncReliabilityRoute.js";
 import { stallMonitor as syncStallMonitor } from "./controllers/syncReliabilityController.js";
 import groupManagementRouter from "./routes/groupManagementRoute.js";
+import groupCommunicationRouter from "./routes/groupCommunicationRoute.js";
 import { reliabilityHeartbeatMonitor } from "./controllers/networkReliabilityController.js";
 import { presenceService, presenceEvents, heartbeatMonitor } from "./controllers/presenceController.js";
 import { PresenceEventType } from "./presence/events/events.js";
@@ -283,6 +284,15 @@ app.use("/api/sync-reliability", syncReliabilityRouter);
 // over control-plane metadata only (no message content / keys). Additive + independent of the Layer 1
 // `/api/groups` chat routes. NO group messaging / encryption / fan-out — those consume this in Sprint 2.
 app.use("/api/group-management", groupManagementRouter);
+
+// Layer 10 Sprint 2 — Group Communication Engine: turns the Sprint-1 Group Foundation into a live,
+// end-to-end-encrypted channel — secure group messaging, group key management + membership rekeying
+// (fresh secret on departure), intelligent multi-device fan-out, group synchronization, and offline-
+// member support. Reuses Layer 5 (HKDF key hierarchy), Layer 8 (reliable messaging fan-out), Layer 9
+// (synchronization delta model), and the Sprint-1 Group Manager (membership). BLIND relay: stores key
+// METADATA (fingerprints/versions) + OPAQUE ciphertext only — never keys/plaintext. NO monitoring/
+// hardening (Sprint 3) or read receipts (Sprint 4) — its events are the seam those consume.
+app.use("/api/group-communication", groupCommunicationRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
