@@ -95,6 +95,9 @@ export class CommunicationFabricManager {
 
     this.decisionCache = deps.decisionCache ?? new DecisionCache({ ttlMs: this.config.decisionCacheTtlMs, max: this.config.decisionCacheMax, clock: this.clock });
 
+    // Sprint 3 seam: optional Global Optimizer hook consulted before orchestration (default off).
+    this.executionHook = deps.executionHook ?? null;
+
     this._metrics = { requests: 0, executed: 0, completed: 0, partial: 0, failed: 0, denied: 0, aborted: 0 };
   }
 
@@ -137,6 +140,24 @@ export class CommunicationFabricManager {
 
     if (opts.dryRun) {
       return toResultView({ decision, plan, execution: null, context });
+    }
+
+    // Sprint 3 seam: a deployment may inject an `executionHook` (the Global Optimizer) consulted between
+    // planning and orchestration. It schedules the communication globally (QoS + resources + scheduling)
+    // and returns `{ proceed, status?, scheduling? }`. When `proceed === false` the plan is DEFERRED/queued
+    // (the optimizer holds it), so the manager returns without orchestrating now. Absent a hook (the
+    // default, and every Sprint 1/2 test), execution is always immediate — behaviour is unchanged.
+    if (this.executionHook && !opts.skipOptimization) {
+      let scheduling = null;
+      try {
+        scheduling = await this.executionHook({ context, decision, plan, opts });
+      } catch {
+        scheduling = null; // a failing optimizer never blocks communication — proceed immediately
+      }
+      if (scheduling && scheduling.proceed === false) {
+        await this._audit(decision.requestId, FabricEventType.EXECUTION_PLANNED, { status: scheduling.status ?? "deferred" });
+        return { ...toResultView({ decision, plan, execution: null, context }), status: scheduling.status ?? "deferred", scheduling: scheduling.scheduling ?? scheduling.info ?? null };
+      }
     }
 
     // orchestrate — delegate every step to its registered subsystem
