@@ -44,6 +44,8 @@ import { stallMonitor as groupStallMonitor } from "./controllers/groupReliabilit
 import groupReceiptRouter from "./routes/groupReceiptRoute.js";
 import mediaRouter from "./routes/mediaRoute.js";
 import mediaDeliveryRouter from "./routes/mediaDeliveryRoute.js";
+import mediaReliabilityRouter from "./routes/mediaReliabilityRoute.js";
+import { stallMonitor as mediaStallMonitor } from "./controllers/mediaReliabilityController.js";
 import { reliabilityHeartbeatMonitor } from "./controllers/networkReliabilityController.js";
 import { presenceService, presenceEvents, heartbeatMonitor } from "./controllers/presenceController.js";
 import { PresenceEventType } from "./presence/events/events.js";
@@ -334,6 +336,15 @@ app.use("/api/media", mediaRouter);
 // (chunking) + Layer 9 (sync). NO voice/video/screen-share/real-time/codecs (Sprint 3 / Layer 12).
 app.use("/api/media-delivery", mediaDeliveryRouter);
 
+// Layer 11 Sprint 3 — Media Reliability & Production Hardening: makes the Secure Media Platform
+// production-grade — interrupted-upload / interrupted-download / streaming / pipeline / storage / sync
+// recovery (resume from a monotonic checkpoint preserving integrity + metadata consistency), health
+// monitoring (per-operation + per-media), configurable retry policies, observability (MediaMetrics
+// Prometheus/OTel + cache-hit-rate), a hot-metadata cache, security validation + audit, and a protocol
+// freeze declaring the stable interfaces + Layer 12 extension points. Carries NO content/keys. Completes
+// Layer 11; Layer 12 (Distributed Hybrid Architecture) builds on the frozen interfaces + seams.
+app.use("/api/media-reliability", mediaReliabilityRouter);
+
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
 await connectDB();
@@ -356,6 +367,10 @@ console.log("Synchronization reliability stall monitor started.");
 // Layer 10 Sprint 3 — start the group-operation stall monitor (no-progress sweeps → recovery). Unref'd.
 groupStallMonitor.start();
 console.log("Group reliability stall monitor started.");
+
+// Layer 11 Sprint 3 — start the media-operation stall monitor (no-progress sweeps → recovery). Unref'd.
+mediaStallMonitor.start();
+console.log("Media reliability stall monitor started.");
 
 // Layer 7 Sprint 3 — start the connection reliability heartbeat monitor (periodic timeout sweeps →
 // automatic recovery). Timer is unref'd.
