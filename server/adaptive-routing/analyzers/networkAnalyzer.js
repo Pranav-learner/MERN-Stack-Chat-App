@@ -15,7 +15,7 @@
  * @security Reports substrate availability booleans + null placeholders only. No content, no addresses.
  */
 
-import { deepFreeze } from "../../communication-fabric/index.js";
+import { deepFreeze } from "../_fabric.js";
 import { Availability, NetworkSubstrate, AdaptiveEventType } from "../types/types.js";
 
 export class NetworkAnalyzer {

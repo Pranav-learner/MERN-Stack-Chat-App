@@ -26,13 +26,28 @@ import { createFabricApi } from "../communication-fabric/api/fabricApi.js";
 import { createMongoFabricRepository } from "../communication-fabric/repository/mongoFabricRepository.js";
 import { createSubsystemAdapter } from "../communication-fabric/registry/subsystemAdapter.js";
 import { FabricEventBus } from "../communication-fabric/events/events.js";
-import { FabricError, SubsystemKind } from "../communication-fabric/index.js";
+import { FabricError, SubsystemKind, createDefaultStrategyRegistry } from "../communication-fabric/index.js";
+import { createFabricAdaptiveIntegration } from "../adaptive-routing/integration/fabricIntegration.js";
 
 /** Shared fabric event bus. Sprint 2 (intelligent routing) + future dashboards subscribe here. */
 export const fabricEvents = new FabricEventBus();
 
-/** Process-wide Communication Fabric Manager over the Mongo-backed repository. */
-export const communicationFabricManager = new CommunicationFabricManager({ ...createMongoFabricRepository(), events: fabricEvents });
+// Layer 12 Sprint 2 — make the Fabric INTELLIGENT: a shared strategy registry + the adaptive integration
+// (scoring-driven decision rule + adaptive route planner) turn the Fabric's deterministic decision into an
+// adaptive one. The decision is now ordered by capability/network/policy route scores, and every plan
+// carries scored, ranked fallback routes + `adaptive: true` diagnostics. Backward compatible: the manager
+// still authorizes, validates, orchestrates, and persists exactly as in Sprint 1.
+const fabricStrategyRegistry = createDefaultStrategyRegistry();
+const adaptiveIntegration = createFabricAdaptiveIntegration({ strategyRegistry: fabricStrategyRegistry, fabricEvents });
+
+/** Process-wide Communication Fabric Manager over the Mongo-backed repository, now adaptive. */
+export const communicationFabricManager = new CommunicationFabricManager({
+  ...createMongoFabricRepository(),
+  events: fabricEvents,
+  strategyRegistry: fabricStrategyRegistry,
+  decisionRules: adaptiveIntegration.decisionRules,
+  routePlanner: adaptiveIntegration.routePlanner,
+});
 
 /** The stable facade the HTTP handlers delegate to. */
 export const fabricApi = createFabricApi(communicationFabricManager);

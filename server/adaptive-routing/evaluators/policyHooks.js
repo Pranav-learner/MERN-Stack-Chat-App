@@ -12,7 +12,7 @@
  * @security Hooks read control-plane analysis + config only. No content.
  */
 
-import { PolicyKind } from "../../communication-fabric/index.js";
+import { PolicyKind } from "../_fabric.js";
 import { StrategyType, RouteKind, ScoreDimension, PayloadClass } from "../types/types.js";
 
 /**

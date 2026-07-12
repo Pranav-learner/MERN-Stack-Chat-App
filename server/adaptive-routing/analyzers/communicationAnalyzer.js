@@ -11,13 +11,13 @@
  * @security Pure control-plane projection — ids + classifications + sizes. No content.
  */
 
-import { deepFreeze } from "../../communication-fabric/index.js";
+import { deepFreeze } from "../_fabric.js";
 import { PRIORITY_RANK, MediaType, ConversationType, PayloadClass, PAYLOAD_SIZE_CLASS } from "../types/types.js";
 
 export class CommunicationAnalyzer {
   /**
    * Analyze a context into a normalized communication analysis.
-   * @param {import("../../communication-fabric/index.js").CommunicationContext} context
+   * @param {import("../_fabric.js").CommunicationContext} context
    * @returns {object} frozen analysis
    */
   analyze(context) {

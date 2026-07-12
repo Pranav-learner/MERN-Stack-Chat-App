@@ -11,7 +11,7 @@
  * booleans) — no bytes. `payloadRef` stays the frozen Sprint-1 opaque descriptor.
  */
 
-import { normalizeCommunicationRequest } from "../../communication-fabric/index.js";
+import { normalizeCommunicationRequest } from "../_fabric.js";
 import { Availability } from "../types/types.js";
 
 const asString = (v) => (v == null ? undefined : String(v));

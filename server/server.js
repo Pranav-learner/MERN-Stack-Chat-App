@@ -47,6 +47,7 @@ import mediaDeliveryRouter from "./routes/mediaDeliveryRoute.js";
 import mediaReliabilityRouter from "./routes/mediaReliabilityRoute.js";
 import { stallMonitor as mediaStallMonitor } from "./controllers/mediaReliabilityController.js";
 import communicationFabricRouter from "./routes/communicationFabricRoute.js";
+import adaptiveRoutingRouter from "./routes/adaptiveRoutingRoute.js";
 import { reliabilityHeartbeatMonitor } from "./controllers/networkReliabilityController.js";
 import { presenceService, presenceEvents, heartbeatMonitor } from "./controllers/presenceController.js";
 import { PresenceEventType } from "./presence/events/events.js";
@@ -355,6 +356,18 @@ app.use("/api/media-reliability", mediaReliabilityRouter);
 // every persist. Sprint 2 (intelligent/adaptive routing) consumes this sprint's events + rule/route/policy
 // seams. Placeholders (relay + hybrid strategies) are declared but inert.
 app.use("/api/communication-fabric", communicationFabricRouter);
+
+// Layer 12 Sprint 2 — Intelligent Routing & Adaptive Communication: turns the Fabric's deterministic
+// decision into an ADAPTIVE one. It collects capability profiles, analyzes the communication + network
+// posture, scores candidate routes with pluggable scorers (transport availability / security / capability
+// match / policy / cost / sync — plus inert Sprint-3 placeholders for network quality / latency /
+// bandwidth), selects the optimal strategy WITHOUT hardcoded conditionals, and produces explainable
+// execution + deterministic fallback plans. Policy hooks (data-saver / battery-saver / enterprise /
+// security) influence scoring. Reasons over control-plane metadata + declared capability + injected
+// availability only (NO probing / ML this sprint). The same integration also makes /api/communication-
+// fabric intelligent. Sprint 3 (resource optimization / QoS) consumes its events + activates the reserved
+// scoring dimensions.
+app.use("/api/adaptive-routing", adaptiveRoutingRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");

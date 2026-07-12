@@ -12,7 +12,7 @@
 
 import crypto from "node:crypto";
 import { TransportCapability, CapabilityFeature, MediaType, CURRENT_PROTOCOL_VERSION } from "../types/types.js";
-import { deepFreeze } from "../../communication-fabric/index.js";
+import { deepFreeze } from "../_fabric.js";
 
 /** A permissive baseline profile used when a party declares nothing (the Fabric stays functional). */
 export const BASELINE_CAPABILITIES = Object.freeze({

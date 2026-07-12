@@ -54,6 +54,12 @@ export function toFallbackView(fallbackPlan) {
   return { primary: fallbackPlan.primary, fallbacks: fallbackPlan.fallbacks, retryPolicy: fallbackPlan.retryPolicy, failureMetadata: fallbackPlan.failureMetadata };
 }
 
+/** Selection view — normalizes the selector's internal `strategyType`/`routeKind` to `strategy`/`route`. */
+export function toSelectionView(selection) {
+  if (!selection) return null;
+  return { strategy: selection.strategyType, route: selection.routeKind, score: selection.score, adaptive: selection.adaptive, ambiguous: selection.ambiguous, runnerUp: selection.runnerUp ?? null };
+}
+
 /** The full adaptive evaluation view (the API's primary payload). */
 export function toEvaluationView(evaluation) {
   if (!evaluation) return null;
@@ -63,7 +69,7 @@ export function toEvaluationView(evaluation) {
     analysis: toAnalysisView(evaluation.analysis),
     network: toNetworkView(evaluation.network),
     ranking: toRankingView(evaluation.ranked),
-    selection: evaluation.selection,
+    selection: toSelectionView(evaluation.selection),
     fallbackPlan: toFallbackView(evaluation.fallbackPlan),
     executionPlan: evaluation.executionPlan ?? null,
     explanation: evaluation.explanation,

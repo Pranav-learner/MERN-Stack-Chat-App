@@ -11,7 +11,7 @@
  */
 
 import { RouteKind, NetworkSubstrate } from "../types/types.js";
-import { deepFreeze } from "../../communication-fabric/index.js";
+import { deepFreeze } from "../_fabric.js";
 
 /** Which network substrate's availability governs each route kind. */
 export const ROUTE_SUBSTRATE = Object.freeze({

@@ -15,7 +15,7 @@
  */
 
 import { createRoute } from "../../communication-fabric/routing/route.js";
-import { FabricEventType } from "../../communication-fabric/index.js";
+import { FabricEventType } from "../_fabric.js";
 
 export class AdaptiveRoutePlanner {
   /**
@@ -26,7 +26,7 @@ export class AdaptiveRoutePlanner {
    * @param {import("../routing/candidateBuilder.js").CandidateBuilder} deps.candidateBuilder
    * @param {import("../scoring/routeScoringEngine.js").RouteScoringEngine} deps.scoringEngine
    * @param {import("../evaluators/policyEvaluationEngine.js").PolicyEvaluationEngine} deps.policyEngine
-   * @param {import("../../communication-fabric/index.js").FabricEventBus} [deps.events] the Fabric bus (for RoutePlanned)
+   * @param {import("../_fabric.js").FabricEventBus} [deps.events] the Fabric bus (for RoutePlanned)
    */
   constructor(deps = {}) {
     for (const k of ["capabilityEngine", "communicationAnalyzer", "networkAnalyzer", "candidateBuilder", "scoringEngine", "policyEngine"]) {

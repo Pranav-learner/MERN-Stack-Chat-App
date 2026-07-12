@@ -16,7 +16,7 @@ import { supportsTransport } from "../capability/capabilityProfile.js";
 import { isUsable } from "../analyzers/networkAnalyzer.js";
 
 export class CandidateBuilder {
-  /** @param {object} deps @param {import("../../communication-fabric/index.js").StrategyRegistry} deps.strategyRegistry */
+  /** @param {object} deps @param {import("../_fabric.js").StrategyRegistry} deps.strategyRegistry */
   constructor(deps = {}) {
     if (!deps.strategyRegistry) throw new Error("CandidateBuilder requires a strategyRegistry");
     this.strategyRegistry = deps.strategyRegistry;

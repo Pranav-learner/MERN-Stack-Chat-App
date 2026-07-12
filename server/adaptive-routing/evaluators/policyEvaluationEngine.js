@@ -11,7 +11,7 @@
  * @security Reads control-plane context + analysis + config only. A denial raises before any routing.
  */
 
-import { PolicyEngine } from "../../communication-fabric/index.js";
+import { PolicyEngine } from "../_fabric.js";
 import { DEFAULT_POLICY_HOOKS } from "./policyHooks.js";
 import { PolicyConflictError } from "../errors.js";
 import { AdaptiveEventType, RouteKind, StrategyType } from "../types/types.js";

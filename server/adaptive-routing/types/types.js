@@ -27,7 +27,7 @@
  */
 
 // Re-export the frozen Sprint-1 vocabulary this layer consumes, so downstream adaptive code has one import.
-export { CommunicationType, ConversationType, MediaType, Priority, StrategyType, RouteKind, SubsystemKind, PRIORITY_RANK } from "../../communication-fabric/index.js";
+export { CommunicationType, ConversationType, MediaType, Priority, StrategyType, RouteKind, SubsystemKind, PRIORITY_RANK } from "../_fabric.js";
 
 // === capability ============================================================
 

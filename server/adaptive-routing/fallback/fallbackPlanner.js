@@ -13,7 +13,7 @@
  * @security The plan is `(strategyType, routeKind, reason)` tuples + retry metadata. No content.
  */
 
-import { deepFreeze } from "../../communication-fabric/index.js";
+import { deepFreeze } from "../_fabric.js";
 import { FallbackReason, DEFAULT_RETRY_POLICY, RouteKind, StrategyType, AdaptiveEventType, ADAPTIVE_SCHEMA_VERSION } from "../types/types.js";
 
 export class FallbackPlanner {
