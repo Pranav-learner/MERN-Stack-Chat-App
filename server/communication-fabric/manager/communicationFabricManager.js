@@ -86,7 +86,10 @@ export class CommunicationFabricManager {
       resolveSecurity: deps.resolvers?.security,
     });
     this.decisionEngine = new DecisionEngine({ strategyRegistry: this.strategyRegistry, rules: deps.decisionRules, clock: this.clock, idGenerator: () => `dec_${reqSeq()}` });
-    this.routePlanner = new RoutePlanner({ events: this.events });
+    // Sprint 2 seam: a deployment may inject an adaptive route planner (e.g. the scoring-driven
+    // AdaptiveRoutePlanner) implementing the same `planRoute(decision, context)` contract. Defaults to the
+    // deterministic Sprint-1 planner, so existing behaviour is unchanged.
+    this.routePlanner = deps.routePlanner ?? new RoutePlanner({ events: this.events });
     this.executionPlanner = new ExecutionPlanner({ strategyRegistry: this.strategyRegistry, routePlanner: this.routePlanner, events: this.events, clock: this.clock });
     this.orchestrator = new Orchestrator({ registry: this.subsystemRegistry, events: this.events, clock: this.clock });
 
