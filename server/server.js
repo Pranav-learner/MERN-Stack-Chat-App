@@ -42,6 +42,7 @@ import groupCommunicationRouter from "./routes/groupCommunicationRoute.js";
 import groupReliabilityRouter from "./routes/groupReliabilityRoute.js";
 import { stallMonitor as groupStallMonitor } from "./controllers/groupReliabilityController.js";
 import groupReceiptRouter from "./routes/groupReceiptRoute.js";
+import mediaRouter from "./routes/mediaRoute.js";
 import { reliabilityHeartbeatMonitor } from "./controllers/networkReliabilityController.js";
 import { presenceService, presenceEvents, heartbeatMonitor } from "./controllers/presenceController.js";
 import { PresenceEventType } from "./presence/events/events.js";
@@ -313,6 +314,15 @@ app.use("/api/group-reliability", groupReliabilityRouter);
 // carries NO content/keys. Configurable receipt policy (exclusions / read-receipts-off / privacy hooks)
 // is the seam for future privacy + business rules without architecture changes.
 app.use("/api/group-receipts", groupReceiptRouter);
+
+// Layer 11 Sprint 1 — Secure Media Pipeline: a reusable platform that securely handles ENCRYPTED media
+// through its whole lifecycle (upload, download, per-file encryption, metadata, integrity verification,
+// upload/download orchestration) with a PLUGGABLE storage provider. The server is a BLIND relay: the
+// client encrypts device-side (per-file key, never sent) and uploads OPAQUE ciphertext + non-secret
+// iv/tag + a key fingerprint; the pipeline stores the blob, verifies integrity, and serves opaque
+// ciphertext for device-side decryption. Reuses Layer 5 (crypto), 8 (transport), 9 (sync), 10 (group).
+// NO streaming / progressive transfers / thumbnails / previews (Sprint 2).
+app.use("/api/media", mediaRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
