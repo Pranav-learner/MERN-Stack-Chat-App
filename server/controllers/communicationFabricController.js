@@ -28,6 +28,7 @@ import { createSubsystemAdapter } from "../communication-fabric/registry/subsyst
 import { FabricEventBus } from "../communication-fabric/events/events.js";
 import { FabricError, SubsystemKind, createDefaultStrategyRegistry } from "../communication-fabric/index.js";
 import { createFabricAdaptiveIntegration } from "../adaptive-routing/integration/fabricIntegration.js";
+import { optimizationExecutionHook } from "./optimizationController.js";
 
 /** Shared fabric event bus. Sprint 2 (intelligent routing) + future dashboards subscribe here. */
 export const fabricEvents = new FabricEventBus();
@@ -41,12 +42,17 @@ const fabricStrategyRegistry = createDefaultStrategyRegistry();
 const adaptiveIntegration = createFabricAdaptiveIntegration({ strategyRegistry: fabricStrategyRegistry, fabricEvents });
 
 /** Process-wide Communication Fabric Manager over the Mongo-backed repository, now adaptive. */
+// Layer 12 Sprint 3 — make the Fabric GLOBALLY OPTIMIZED: the optimization execution hook is consulted
+// between planning and orchestration to schedule the communication (QoS + resources + workload). Immediate
+// traffic proceeds; deferred/background traffic is queued in the optimizer (drained via /api/optimization/
+// dispatch). Additive + backward compatible: absent the hook the Fabric always executes immediately.
 export const communicationFabricManager = new CommunicationFabricManager({
   ...createMongoFabricRepository(),
   events: fabricEvents,
   strategyRegistry: fabricStrategyRegistry,
   decisionRules: adaptiveIntegration.decisionRules,
   routePlanner: adaptiveIntegration.routePlanner,
+  executionHook: optimizationExecutionHook,
 });
 
 /** The stable facade the HTTP handlers delegate to. */

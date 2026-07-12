@@ -14,7 +14,8 @@
  * @security Reasons over abstract budget numbers only. No content.
  */
 
-import { deepFreeze, ALL_RESOURCE_KINDS, DEFAULT_RESOURCE_BUDGETS, CONSTRAINED_UTILIZATION, OptimizationEventType } from "../types/types.js";
+import { deepFreeze } from "../_fabric.js";
+import { ALL_RESOURCE_KINDS, DEFAULT_RESOURCE_BUDGETS, CONSTRAINED_UTILIZATION, OptimizationEventType } from "../types/types.js";
 import { InvalidResourcePlanError } from "../errors.js";
 
 export class GlobalResourceManager {

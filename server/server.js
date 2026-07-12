@@ -48,6 +48,7 @@ import mediaReliabilityRouter from "./routes/mediaReliabilityRoute.js";
 import { stallMonitor as mediaStallMonitor } from "./controllers/mediaReliabilityController.js";
 import communicationFabricRouter from "./routes/communicationFabricRoute.js";
 import adaptiveRoutingRouter from "./routes/adaptiveRoutingRoute.js";
+import optimizationRouter from "./routes/optimizationRoute.js";
 import { reliabilityHeartbeatMonitor } from "./controllers/networkReliabilityController.js";
 import { presenceService, presenceEvents, heartbeatMonitor } from "./controllers/presenceController.js";
 import { PresenceEventType } from "./presence/events/events.js";
@@ -368,6 +369,19 @@ app.use("/api/communication-fabric", communicationFabricRouter);
 // fabric intelligent. Sprint 3 (resource optimization / QoS) consumes its events + activates the reserved
 // scoring dimensions.
 app.use("/api/adaptive-routing", adaptiveRoutingRouter);
+
+// Layer 12 Sprint 3 — Resource Optimization & Global Coordination: optimizes communication GLOBALLY rather
+// than one request at a time. It coordinates QoS classification (critical/high/normal/background with
+// isolated lanes, fair scheduling + starvation-preventing aging), the communication scheduler (immediate/
+// deferred/background/batch, execution windows, weighted-fair dispatch), the Global Resource Manager
+// (abstract bandwidth/cpu/memory/storage/connection/transfer/queue/execution budgets → allocation
+// RECOMMENDATIONS, never OS resources), adaptive resource policies (bandwidth/memory/battery/storage/sync/
+// enterprise hooks), cross-device coordination (deterministic primary + replica plan), workload balancing
+// (backpressure + adaptive queue selection), and an optimized execution planner (execution + scheduling +
+// QoS + resource + coordination + timeline). Reasons over control-plane metadata + abstract units only
+// (no content/keys, no OS calls). The same hook makes /api/communication-fabric globally optimized. NO
+// monitoring/observability/auto-tuning (Sprint 4). Sprint 4 consumes its events + wires a dispatch worker.
+app.use("/api/optimization", optimizationRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
