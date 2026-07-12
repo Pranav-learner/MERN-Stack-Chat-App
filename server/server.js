@@ -49,6 +49,8 @@ import { stallMonitor as mediaStallMonitor } from "./controllers/mediaReliabilit
 import communicationFabricRouter from "./routes/communicationFabricRoute.js";
 import adaptiveRoutingRouter from "./routes/adaptiveRoutingRoute.js";
 import optimizationRouter from "./routes/optimizationRoute.js";
+import fabricReliabilityRouter from "./routes/fabricReliabilityRoute.js";
+import { stallMonitor as fabricReliabilityStallMonitor } from "./controllers/fabricReliabilityController.js";
 import { reliabilityHeartbeatMonitor } from "./controllers/networkReliabilityController.js";
 import { presenceService, presenceEvents, heartbeatMonitor } from "./controllers/presenceController.js";
 import { PresenceEventType } from "./presence/events/events.js";
@@ -383,6 +385,16 @@ app.use("/api/adaptive-routing", adaptiveRoutingRouter);
 // monitoring/observability/auto-tuning (Sprint 4). Sprint 4 consumes its events + wires a dispatch worker.
 app.use("/api/optimization", optimizationRouter);
 
+// Layer 12 Sprint 4 — Production Communication Fabric: makes the whole Communication Fabric (Sprint 1
+// orchestration + Sprint 2 adaptive routing + Sprint 3 optimization) production-grade — recovery,
+// continuous health monitoring, operational resilience (circuit breakers / timeouts / bulkheads / retries
+// / graceful degradation), observability (metrics + Prometheus/OTel + structured logging + tracing hooks),
+// security validation (authz + replay + rate-limit + audit of every orchestration decision), and
+// operational tooling (liveness / readiness / diagnostics / inspection / status / architecture freeze). It
+// consumes the Sprint 1/2/3 event buses (no coupling — routed by event type) and hardens the CONTROL PLANE
+// by wrapping operations at the call site, WITHOUT modifying any lower layer. Completes + FREEZES Layer 12.
+app.use("/api/fabric-reliability", fabricReliabilityRouter);
+
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
 await connectDB();
@@ -409,6 +421,11 @@ console.log("Group reliability stall monitor started.");
 // Layer 11 Sprint 3 — start the media-operation stall monitor (no-progress sweeps → recovery). Unref'd.
 mediaStallMonitor.start();
 console.log("Media reliability stall monitor started.");
+
+// Layer 12 Sprint 4 — start the fabric reliability monitor (recovery stall-sweep + health checks + alerts +
+// periodic health snapshots). Timers are unref'd so they never keep the process alive.
+fabricReliabilityStallMonitor.start();
+console.log("Fabric reliability monitor started.");
 
 // Layer 7 Sprint 3 — start the connection reliability heartbeat monitor (periodic timeout sweeps →
 // automatic recovery). Timer is unref'd.
