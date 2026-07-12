@@ -37,6 +37,7 @@ import synchronizationRouter from "./routes/synchronizationRoute.js";
 import replicationRouter from "./routes/replicationRoute.js";
 import syncReliabilityRouter from "./routes/syncReliabilityRoute.js";
 import { stallMonitor as syncStallMonitor } from "./controllers/syncReliabilityController.js";
+import groupManagementRouter from "./routes/groupManagementRoute.js";
 import { reliabilityHeartbeatMonitor } from "./controllers/networkReliabilityController.js";
 import { presenceService, presenceEvents, heartbeatMonitor } from "./controllers/presenceController.js";
 import { PresenceEventType } from "./presence/events/events.js";
@@ -274,6 +275,14 @@ app.use("/api/replication", replicationRouter);
 // NO content/keys; recovery preserves replica consistency. Completes Layer 9; Layer 10 (secure group
 // communication) builds on the frozen sync interfaces.
 app.use("/api/sync-reliability", syncReliabilityRouter);
+
+// Layer 10 Sprint 1 — Group Foundation & Membership Management: treats a Group as a FIRST-CLASS
+// distributed entity with its own identity, lifecycle, membership (invite/accept/reject, join/approve,
+// leave/remove/ban/mute, transfer ownership), role-based access control, a configurable permission
+// system, versioned metadata, a per-facet version vector, and a reconcilable replica snapshot. Reasons
+// over control-plane metadata only (no message content / keys). Additive + independent of the Layer 1
+// `/api/groups` chat routes. NO group messaging / encryption / fan-out — those consume this in Sprint 2.
+app.use("/api/group-management", groupManagementRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
