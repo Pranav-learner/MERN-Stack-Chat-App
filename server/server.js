@@ -39,6 +39,8 @@ import syncReliabilityRouter from "./routes/syncReliabilityRoute.js";
 import { stallMonitor as syncStallMonitor } from "./controllers/syncReliabilityController.js";
 import groupManagementRouter from "./routes/groupManagementRoute.js";
 import groupCommunicationRouter from "./routes/groupCommunicationRoute.js";
+import groupReliabilityRouter from "./routes/groupReliabilityRoute.js";
+import { stallMonitor as groupStallMonitor } from "./controllers/groupReliabilityController.js";
 import { reliabilityHeartbeatMonitor } from "./controllers/networkReliabilityController.js";
 import { presenceService, presenceEvents, heartbeatMonitor } from "./controllers/presenceController.js";
 import { PresenceEventType } from "./presence/events/events.js";
@@ -294,6 +296,15 @@ app.use("/api/group-management", groupManagementRouter);
 // hardening (Sprint 3) or read receipts (Sprint 4) — its events are the seam those consume.
 app.use("/api/group-communication", groupCommunicationRouter);
 
+// Layer 10 Sprint 3 — Group Reliability & Production Hardening: makes the Group Communication platform
+// production-grade — interrupted-messaging / failed-fan-out / rekey / membership / replica / sync /
+// offline recovery, continuous health monitoring (per-operation + per-group), configurable retry
+// policies, observability (metrics + Prometheus/OTel hooks), security validation + audit, and a protocol
+// freeze declaring the stable interfaces + Sprint 4 extension points. Carries NO content/keys; recovery
+// preserves consistency (the monotonic operation checkpoint). Completes Layer 10; Sprint 4 (Group
+// Delivery & Read Receipt Engine) builds on the frozen interfaces + delivery-leg + event seams.
+app.use("/api/group-reliability", groupReliabilityRouter);
+
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
 await connectDB();
@@ -312,6 +323,10 @@ console.log("Transport reliability stall monitor started.");
 // Layer 9 Sprint 3 — start the synchronization stall monitor (no-progress sweeps → recovery). Unref'd.
 syncStallMonitor.start();
 console.log("Synchronization reliability stall monitor started.");
+
+// Layer 10 Sprint 3 — start the group-operation stall monitor (no-progress sweeps → recovery). Unref'd.
+groupStallMonitor.start();
+console.log("Group reliability stall monitor started.");
 
 // Layer 7 Sprint 3 — start the connection reliability heartbeat monitor (periodic timeout sweeps →
 // automatic recovery). Timer is unref'd.
