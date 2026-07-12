@@ -46,6 +46,7 @@ import mediaRouter from "./routes/mediaRoute.js";
 import mediaDeliveryRouter from "./routes/mediaDeliveryRoute.js";
 import mediaReliabilityRouter from "./routes/mediaReliabilityRoute.js";
 import { stallMonitor as mediaStallMonitor } from "./controllers/mediaReliabilityController.js";
+import communicationFabricRouter from "./routes/communicationFabricRoute.js";
 import { reliabilityHeartbeatMonitor } from "./controllers/networkReliabilityController.js";
 import { presenceService, presenceEvents, heartbeatMonitor } from "./controllers/presenceController.js";
 import { PresenceEventType } from "./presence/events/events.js";
@@ -344,6 +345,16 @@ app.use("/api/media-delivery", mediaDeliveryRouter);
 // freeze declaring the stable interfaces + Layer 12 extension points. Carries NO content/keys. Completes
 // Layer 11; Layer 12 (Distributed Hybrid Architecture) builds on the frozen interfaces + seams.
 app.use("/api/media-reliability", mediaReliabilityRouter);
+
+// Layer 12 Sprint 1 — Distributed Communication Fabric: the ORCHESTRATION layer of the whole platform and
+// the single entry point for every communication request. It coordinates the frozen lower layers
+// (security, connectivity, messaging, media, synchronization, groups, delivery) WITHOUT reimplementing
+// them: a request builds an immutable context, is shaped by configurable policies, and is routed by a
+// pluggable Decision Engine to a strategy + execution plan, which the orchestrator delegates to registered
+// subsystem adapters. Reasons over control-plane metadata ONLY (no content/keys); a no-content scan guards
+// every persist. Sprint 2 (intelligent/adaptive routing) consumes this sprint's events + rule/route/policy
+// seams. Placeholders (relay + hybrid strategies) are declared but inert.
+app.use("/api/communication-fabric", communicationFabricRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
