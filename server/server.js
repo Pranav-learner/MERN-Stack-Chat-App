@@ -41,6 +41,7 @@ import groupManagementRouter from "./routes/groupManagementRoute.js";
 import groupCommunicationRouter from "./routes/groupCommunicationRoute.js";
 import groupReliabilityRouter from "./routes/groupReliabilityRoute.js";
 import { stallMonitor as groupStallMonitor } from "./controllers/groupReliabilityController.js";
+import groupReceiptRouter from "./routes/groupReceiptRoute.js";
 import { reliabilityHeartbeatMonitor } from "./controllers/networkReliabilityController.js";
 import { presenceService, presenceEvents, heartbeatMonitor } from "./controllers/presenceController.js";
 import { PresenceEventType } from "./presence/events/events.js";
@@ -304,6 +305,14 @@ app.use("/api/group-communication", groupCommunicationRouter);
 // preserves consistency (the monotonic operation checkpoint). Completes Layer 10; Sprint 4 (Group
 // Delivery & Read Receipt Engine) builds on the frozen interfaces + delivery-leg + event seams.
 app.use("/api/group-reliability", groupReliabilityRouter);
+
+// Layer 10 Sprint 4 — Group Delivery Intelligence & Receipt Aggregation: an INDEPENDENT subsystem on top
+// of the frozen group platform. Tracks per-member delivery + read state (multi-device, deduplicated),
+// aggregates them INCREMENTALLY (O(1) receipt reads, no per-member scans), and serves WhatsApp-style
+// ✓ / ✓✓ / ✓✓-blue indicators + delivery analytics. Auto-driven by the Sprint-2 delivery/received events;
+// carries NO content/keys. Configurable receipt policy (exclusions / read-receipts-off / privacy hooks)
+// is the seam for future privacy + business rules without architecture changes.
+app.use("/api/group-receipts", groupReceiptRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
