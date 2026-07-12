@@ -43,6 +43,7 @@ import groupReliabilityRouter from "./routes/groupReliabilityRoute.js";
 import { stallMonitor as groupStallMonitor } from "./controllers/groupReliabilityController.js";
 import groupReceiptRouter from "./routes/groupReceiptRoute.js";
 import mediaRouter from "./routes/mediaRoute.js";
+import mediaDeliveryRouter from "./routes/mediaDeliveryRoute.js";
 import { reliabilityHeartbeatMonitor } from "./controllers/networkReliabilityController.js";
 import { presenceService, presenceEvents, heartbeatMonitor } from "./controllers/presenceController.js";
 import { PresenceEventType } from "./presence/events/events.js";
@@ -323,6 +324,15 @@ app.use("/api/group-receipts", groupReceiptRouter);
 // ciphertext for device-side decryption. Reuses Layer 5 (crypto), 8 (transport), 9 (sync), 10 (group).
 // NO streaming / progressive transfers / thumbnails / previews (Sprint 2).
 app.use("/api/media", mediaRouter);
+
+// Layer 11 Sprint 2 — Distributed Media Delivery & Streaming: delivers encrypted media efficiently on
+// top of the frozen Sprint-1 pipeline — progressive downloads/uploads (windowed chunks + resume),
+// streaming sessions (buffer + seek + pause/resume), async pluggable thumbnail + preview generation,
+// multi-device media synchronization (reuses Layer 9 delta), and transfer optimization (priorities +
+// parallel scheduling + bandwidth metrics). BLIND relay: moves OPAQUE ciphertext in chunks (per-chunk
+// hash preserves integrity) + control-plane metadata only — never decrypts/keys. Reuses Layer 8
+// (chunking) + Layer 9 (sync). NO voice/video/screen-share/real-time/codecs (Sprint 3 / Layer 12).
+app.use("/api/media-delivery", mediaDeliveryRouter);
 
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
