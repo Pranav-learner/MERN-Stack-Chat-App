@@ -1,34 +1,87 @@
 import Redis from "ioredis";
 
-// Use UPSTASH_REDIS_REST_URL if provided, else fallback to local.
-// Note: ioredis expects a connection string (redis://...)
-const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
+const redisUrl = process.env.REDIS_URL;
+let redis = null;
+const memoryUserSockets = new Map();
 
-redis.on("connect", () => {
-  console.log("Redis connected successfully");
-});
+if (redisUrl) {
+  try {
+    redis = new Redis(redisUrl, {
+      maxRetriesPerRequest: 1,
+      enableOfflineQueue: false,
+    });
+    redis.on("connect", () => console.log("Redis connected successfully"));
+    redis.on("error", (err) => console.warn("Redis connection warning:", err.message));
+  } catch (err) {
+    console.warn("Failed to initialize Redis client:", err.message);
+  }
+} else {
+  try {
+    redis = new Redis("redis://localhost:6379", {
+      maxRetriesPerRequest: 1,
+      enableOfflineQueue: false,
+      retryStrategy: () => null,
+    });
+    redis.on("connect", () => console.log("Local Redis connected successfully"));
+    redis.on("error", () => {
+      // In-memory fallback active when local redis is not running
+    });
+  } catch {
+    redis = null;
+  }
+}
 
-redis.on("error", (err) => {
-  console.error("Redis connection error:", err);
-});
-
-// Helper functions for User Socket Management
+// Helper functions for User Socket Management with resilient in-memory fallback
 
 export const cacheUserSocket = async (userId, socketId) => {
-  await redis.set(`user:${userId}`, socketId);
+  memoryUserSockets.set(String(userId), String(socketId));
+  if (redis && redis.status === "ready") {
+    try {
+      await redis.set(`user:${userId}`, socketId);
+      await redis.sadd("online_users", String(userId));
+    } catch {
+      // In-memory fallback retains the socket mapping
+    }
+  }
 };
 
 export const getUserSocket = async (userId) => {
-  return await redis.get(`user:${userId}`);
+  if (redis && redis.status === "ready") {
+    try {
+      const sock = await redis.get(`user:${userId}`);
+      if (sock) return sock;
+    } catch {
+      // In-memory fallback
+    }
+  }
+  return memoryUserSockets.get(String(userId)) || null;
 };
 
 export const removeUserSocket = async (userId) => {
-  await redis.del(`user:${userId}`);
+  memoryUserSockets.delete(String(userId));
+  if (redis && redis.status === "ready") {
+    try {
+      await redis.del(`user:${userId}`);
+      await redis.srem("online_users", String(userId));
+    } catch {
+      // In-memory fallback
+    }
+  }
 };
 
 export const getOnlineUsers = async () => {
-  const keys = await redis.keys("user:*");
-  return keys.map((key) => key.split(":")[1]);
+  if (redis && redis.status === "ready") {
+    try {
+      const members = await redis.smembers("online_users");
+      if (members && members.length > 0) return members;
+      const keys = await redis.keys("user:*");
+      if (keys.length > 0) return keys.map((key) => key.split(":")[1]);
+    } catch {
+      // In-memory fallback
+    }
+  }
+  return Array.from(memoryUserSockets.keys());
 };
 
 export default redis;
+

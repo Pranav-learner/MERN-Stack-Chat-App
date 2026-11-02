@@ -2,6 +2,7 @@ import express from "express";
 import dotenv from "dotenv/config";
 import cors from "cors";
 import http from "http";
+import mongoose from "mongoose";
 import { connectDB } from "./lib/db.js";
 import userRouter from "./routes/userRoute.js";
 import messageRouter from "./routes/messageRoute.js";
@@ -65,7 +66,7 @@ import { Server } from "socket.io";
 const app = express();
 const server = http.createServer(app);
 
-import { cacheUserSocket, removeUserSocket, getOnlineUsers } from "./lib/redis.js";
+import redis, { cacheUserSocket, removeUserSocket, getOnlineUsers } from "./lib/redis.js";
 
 // Intialise Socket.io
 export const io = new Server(server, {
@@ -186,9 +187,32 @@ for (const type of [PresenceEventType.ONLINE, PresenceEventType.OFFLINE, Presenc
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 
-// API Routes
-app.use("/api/status", (req, res) => {
-  res.send("Server is live");
+// Health check and status endpoints
+const getSystemHealth = () => {
+  const dbConnected = mongoose.connection.readyState === 1;
+  const redisConnected = redis?.status === "ready";
+  return {
+    status: dbConnected ? "ok" : "degraded",
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+    services: {
+      database: dbConnected ? "connected" : "disconnected",
+      redis: redisConnected ? "connected" : "fallback-memory",
+    },
+  };
+};
+
+app.get("/api/status", (req, res) => {
+  const health = getSystemHealth();
+  res.status(200).json({
+    message: "Server is live",
+    ...health,
+  });
+});
+
+app.get("/health", (req, res) => {
+  const health = getSystemHealth();
+  res.status(health.status === "ok" ? 200 : 503).json(health);
 });
 app.use("/api/auth", userRouter);
 app.use("/api/messages", messageRouter);
@@ -442,6 +466,26 @@ server.listen(PORT, "0.0.0.0", () => {
 process.on("unhandledRejection", (err) => {
   console.error("Unhandled Promise Rejection:", err);
 });
+
+const shutdown = (signal) => {
+  console.log(`Received ${signal}. Shutting down gracefully...`);
+  server.close(async () => {
+    try {
+      if (mongoose.connection.readyState === 1) {
+        await mongoose.connection.close();
+      }
+      if (redis && redis.status === "ready") {
+        await redis.quit();
+      }
+    } catch (err) {
+      console.error("Error during shutdown cleanup:", err.message);
+    }
+    process.exit(0);
+  });
+};
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
 
 // Export server for Vercel
 export default server;
