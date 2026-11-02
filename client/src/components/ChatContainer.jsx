@@ -28,6 +28,10 @@ const ChatContainer = () => {
       toast.error("Please select an image file.");
       return;
     }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image file exceeds the 5MB size limit.");
+      return;
+    }
     const reader = new FileReader();
     reader.onloadend = async () => {
       await sendMessage({ image: reader.result });

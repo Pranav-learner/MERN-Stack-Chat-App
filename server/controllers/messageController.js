@@ -1,7 +1,7 @@
 import User from "../models/User.model.js";
 import Message from "../models/Message.model.js";
 import cloudinary from "../lib/cloudinary.js";
-import { io } from "../server.js";
+import { io } from "../lib/socket.js";
 import { getUserSocket, getUserSockets } from "../lib/redis.js"; // Import Redis helpers
 // Layer 4 · Sprint 5 — Secure Session Integration: route sends through the session-aware
 // message pipeline (resolve → validate → prepare secure payload → transport). Additive;
@@ -43,10 +43,9 @@ export const getAllUsers = async (req, res) => {
 // ... existing getAllMessages ...
 
 // Controller to send message
-
 export const sendMessage = async (req, res) => {
   try {
-    const { text, image, securePayload } = req.body;
+    const { text, image, securePayload, clientMessageId } = req.body;
     const receiverId = req.params.id;
     const senderId = req.user._id;
 
@@ -60,10 +59,24 @@ export const sendMessage = async (req, res) => {
       return res.status(400).json({ success: false, message: "Message must contain text or image" });
     }
 
+    // Idempotency check: if clientMessageId already sent by this user, return existing record
+    if (clientMessageId && typeof clientMessageId === "string") {
+      const existing = await Message.findOne({ senderId, clientMessageId });
+      if (existing) {
+        return res.status(200).json({
+          success: true,
+          message: existing,
+          duplicate: true,
+        });
+      }
+    }
+
+    // Validate image size (5MB raw ≈ 7MB base64)
+    if (image && typeof image === "string" && image.length > 7 * 1024 * 1024) {
+      return res.status(400).json({ success: false, message: "Image exceeds maximum allowed size of 5MB" });
+    }
+
     // === End-to-end encrypted path (Layer 4 · Sprint 6) ===================
-    // The client encrypted the message with its device-local session keys. The
-    // server is a RELAY: it validates the ciphertext's structure/binding, persists
-    // CIPHERTEXT ONLY, and delivers it. It never decrypts (it holds no keys).
     if (securePayload) {
       const { payload } = relayManager.relay(securePayload, { sessionId: req.body?.sessionId });
       const stored = toStoredCiphertext(payload, { senderId, receiverId });
@@ -71,6 +84,7 @@ export const sendMessage = async (req, res) => {
         senderId,
         receiverId,
         status: "sent",
+        clientMessageId: clientMessageId || undefined,
         secure: stored.secure,
         session: {
           sessionId: payload.sessionId,
@@ -96,15 +110,21 @@ export const sendMessage = async (req, res) => {
     // === Plaintext / session-aware fallback path (Sprint 5) ===============
     let imageUrl;
 
-    // Upload image to Cloudinary
+    // Upload image to Cloudinary if provided
     if (image) {
-      const upload = await cloudinary.uploader.upload(image);
-      imageUrl = upload.secure_url;
+      try {
+        const upload = await cloudinary.uploader.upload(image);
+        imageUrl = upload.secure_url;
+      } catch (uploadError) {
+        console.error("Cloudinary upload failed:", uploadError.message);
+        return res.status(502).json({
+          success: false,
+          message: "Media storage service unavailable. Failed to upload image.",
+        });
+      }
     }
 
-    // Route the send through the session-aware message pipeline. The transport
-    // persists the message (tagged with its PUBLIC session metadata) and emits it —
-    // the existing delivery behaviour, now session-aware.
+    // Route the send through the session-aware message pipeline
     const { context, delivery: newMessage } = await messagePipeline.process({
       sender: String(senderId),
       recipient: String(receiverId),
@@ -116,6 +136,7 @@ export const sendMessage = async (req, res) => {
           text: envelope.payload.text,
           image: envelope.payload.image,
           status: "sent",
+          clientMessageId: clientMessageId || undefined,
           session: sessionMetadataOf(envelope),
         });
 
@@ -140,22 +161,47 @@ export const sendMessage = async (req, res) => {
   }
 };
 
-// Get all messages for selected user
+// Get messages for selected user with pagination & cursor support
 export const getAllMessages = async (req, res) => {
   try {
-    const userId = req.params.id; // The other user (sender of messages)
+    const userId = req.params.id; // The other user (sender/receiver of messages)
     const myId = req.user._id;
 
     if (!userId) {
       return res.status(400).json({ success: false, message: "User ID is required" });
     }
 
-    const messages = await Message.find({
+    // Bounded page size (default 50, max 100)
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+
+    // Construct conversation query filter
+    const filter = {
       $or: [
         { senderId: myId, receiverId: userId },
         { senderId: userId, receiverId: myId },
       ],
-    });
+    };
+
+    // Cursor pagination: fetch messages created strictly before cursor timestamp
+    if (req.query.before) {
+      const beforeDate = new Date(req.query.before);
+      if (!isNaN(beforeDate.getTime())) {
+        filter.createdAt = { $lt: beforeDate };
+      }
+    }
+
+    // Fetch newest messages first up to limit + 1 to detect hasMore
+    const rawMessages = await Message.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(limit + 1);
+
+    const hasMore = rawMessages.length > limit;
+    const pageMessages = hasMore ? rawMessages.slice(0, limit) : rawMessages;
+
+    // Return messages in chronological order (oldest to newest) for UI rendering
+    const messages = [...pageMessages].reverse();
+    const nextCursor =
+      hasMore && messages.length > 0 ? messages[0].createdAt.toISOString() : null;
 
     // Mark incoming messages as read
     const updateResult = await Message.updateMany(
@@ -169,7 +215,12 @@ export const getAllMessages = async (req, res) => {
       senderSocketIds.forEach((sid) => io.to(sid).emit("messagesRead", { readerId: myId }));
     }
 
-    res.json({ success: true, messages });
+    res.json({
+      success: true,
+      messages,
+      nextCursor,
+      hasMore,
+    });
   } catch (error) {
     console.error("Error in getAllMessages controller:", error.message);
     res.status(500).json({ success: false, message: "Internal server error" });

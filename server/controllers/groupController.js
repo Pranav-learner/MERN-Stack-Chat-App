@@ -1,7 +1,6 @@
 import Group from "../models/Group.model.js";
 import Message from "../models/Message.model.js";
-import User from "../models/User.model.js";
-import { io } from "../server.js";
+import { io } from "../lib/socket.js";
 
 export const createGroup = async (req, res) => {
   try {
@@ -141,8 +140,36 @@ export const getGroupMessages = async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied: you are not a member of this group" });
     }
 
-    const messages = await Message.find({ groupId }).populate("senderId", "fullName profilePic");
-    res.status(200).json({ success: true, messages });
+    // Bounded page size (default 50, max 100)
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50));
+
+    const filter = { groupId };
+    if (req.query.before) {
+      const beforeDate = new Date(req.query.before);
+      if (!isNaN(beforeDate.getTime())) {
+        filter.createdAt = { $lt: beforeDate };
+      }
+    }
+
+    const rawMessages = await Message.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(limit + 1)
+      .populate("senderId", "fullName profilePic");
+
+    const hasMore = rawMessages.length > limit;
+    const pageMessages = hasMore ? rawMessages.slice(0, limit) : rawMessages;
+
+    // Return in chronological order (oldest to newest)
+    const messages = [...pageMessages].reverse();
+    const nextCursor =
+      hasMore && messages.length > 0 ? messages[0].createdAt.toISOString() : null;
+
+    res.status(200).json({
+      success: true,
+      messages,
+      nextCursor,
+      hasMore,
+    });
   } catch (error) {
     console.error("Error in getGroupMessages controller:", error.message);
     res.status(500).json({ success: false, message: "Internal Server Error" });
@@ -151,13 +178,18 @@ export const getGroupMessages = async (req, res) => {
 
 export const sendGroupMessage = async (req, res) => {
   try {
-    const { text, image } = req.body;
+    const { text, image, clientMessageId } = req.body;
     const { groupId } = req.params;
     const senderId = req.user._id;
 
     // Validate payload
     if ((!text || !text.trim()) && !image) {
       return res.status(400).json({ success: false, message: "Message must contain text or image" });
+    }
+
+    // Validate image size (5MB raw ≈ 7MB base64)
+    if (image && typeof image === "string" && image.length > 7 * 1024 * 1024) {
+      return res.status(400).json({ success: false, message: "Image exceeds maximum allowed size of 5MB" });
     }
 
     const group = await Group.findById(groupId);
@@ -171,6 +203,15 @@ export const sendGroupMessage = async (req, res) => {
       return res.status(403).json({ success: false, message: "Access denied: you cannot send messages to this group" });
     }
 
+    // Idempotency check: if clientMessageId already sent to this group by this sender
+    if (clientMessageId && typeof clientMessageId === "string") {
+      const existing = await Message.findOne({ senderId, groupId, clientMessageId })
+        .populate("senderId", "fullName profilePic");
+      if (existing) {
+        return res.status(200).json({ success: true, message: existing, duplicate: true });
+      }
+    }
+
     let imageUrl = image || undefined;
     if (image && typeof image === "string" && image.startsWith("data:image")) {
       try {
@@ -178,7 +219,11 @@ export const sendGroupMessage = async (req, res) => {
         const upload = await cloudinary.uploader.upload(image);
         imageUrl = upload.secure_url;
       } catch (uploadErr) {
-        console.warn("Cloudinary upload failed for group message image:", uploadErr.message);
+        console.error("Cloudinary upload failed for group message image:", uploadErr.message);
+        return res.status(502).json({
+          success: false,
+          message: "Media storage service unavailable. Failed to upload image.",
+        });
       }
     }
 
@@ -187,6 +232,7 @@ export const sendGroupMessage = async (req, res) => {
       groupId,
       text: text ? text.trim() : undefined,
       image: imageUrl,
+      clientMessageId: clientMessageId || undefined,
     });
 
     await newMessage.save();
@@ -202,6 +248,51 @@ export const sendGroupMessage = async (req, res) => {
     res.status(201).json({ success: true, message: newMessage });
   } catch (error) {
     console.error("Error in sendGroupMessage controller:", error.message);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+};
+
+export const leaveGroup = async (req, res) => {
+  try {
+    const { groupId } = req.body;
+    const userId = req.user._id;
+
+    const group = await Group.findById(groupId);
+    if (!group) return res.status(404).json({ success: false, message: "Group not found" });
+
+    group.members = group.members.filter(
+      (id) => id.toString() !== userId.toString()
+    );
+    await group.save();
+
+    res.status(200).json({ success: true, message: "Left group successfully" });
+  } catch (error) {
+    console.error("Error in leaveGroup controller:", error.message);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+};
+
+export const removeMember = async (req, res) => {
+  try {
+    const { groupId, memberId } = req.body;
+    const requesterId = req.user._id;
+
+    const group = await Group.findById(groupId);
+    if (!group) return res.status(404).json({ success: false, message: "Group not found" });
+
+    // Only admin can remove members
+    if (group.admin.toString() !== requesterId.toString()) {
+      return res.status(403).json({ success: false, message: "Only group admin can remove members" });
+    }
+
+    group.members = group.members.filter(
+      (id) => id.toString() !== memberId.toString()
+    );
+    await group.save();
+
+    res.status(200).json({ success: true, message: "Member removed successfully" });
+  } catch (error) {
+    console.error("Error in removeMember controller:", error.message);
     res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };

@@ -113,23 +113,36 @@ export const ChatProvider = ({ children }) => {
     }
   };
 
-  // function to send message to selected user or group
-  const sendMessage = async (messages) => {
+  // function to send message to selected user or group with idempotency key
+  const sendMessage = async (messagePayload) => {
     try {
+      const clientMessageId = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+      const payload = { ...messagePayload, clientMessageId };
+
       if (selectedGroup) {
-        const { data } = await axios.post(`/api/groups/send/${selectedGroup._id}`, messages);
+        const { data } = await axios.post(`/api/groups/send/${selectedGroup._id}`, payload);
         if (data.success) {
-          setMessages((prevMessages) => [...prevMessages, data.message]);
+          setMessages((prevMessages) => {
+            if (prevMessages.some((m) => m._id === data.message._id || (m.clientMessageId && m.clientMessageId === data.message.clientMessageId))) {
+              return prevMessages;
+            }
+            return [...prevMessages, data.message];
+          });
         } else {
           toast.error(data.message);
         }
       } else if (selectedUser) {
         const { data } = await axios.post(
           `api/messages/send/${selectedUser._id}`,
-          messages
+          payload
         );
         if (data.success) {
-          setMessages((prevMessages) => [...prevMessages, data.message]);
+          setMessages((prevMessages) => {
+            if (prevMessages.some((m) => m._id === data.message._id || (m.clientMessageId && m.clientMessageId === data.message.clientMessageId))) {
+              return prevMessages;
+            }
+            return [...prevMessages, data.message];
+          });
         } else {
           toast.error(data.message);
         }
@@ -139,41 +152,49 @@ export const ChatProvider = ({ children }) => {
     }
   };
 
-  //funtion to subscribe to messages for selected user
+  // function to subscribe to messages for selected user
   const subscribeToMessages = () => {
     if (!socket) return;
 
     socket.on("newMessage", (newMessage) => {
       // Handle Group Message
       if (newMessage.groupId) {
-          if (selectedGroup && newMessage.groupId === selectedGroup._id) {
-               const senderId = typeof newMessage.senderId === 'object' ? newMessage.senderId._id : newMessage.senderId;
-               if (senderId === authUser._id) return;
+        if (selectedGroup && newMessage.groupId === selectedGroup._id) {
+          const senderId = typeof newMessage.senderId === 'object' ? newMessage.senderId._id : newMessage.senderId;
+          if (senderId === authUser._id) return;
 
-               setMessages((prev) => [...prev, newMessage]);
-               // Groups don't have "seen" logic per member easily yet
-          } else {
-              setUnseenMessages((prev) => ({
-                ...prev,
-                [newMessage.groupId]: (prev[newMessage.groupId] || 0) + 1,
-              }));
-          }
+          setMessages((prev) => {
+            if (prev.some((m) => m._id === newMessage._id || (m.clientMessageId && m.clientMessageId === newMessage.clientMessageId))) {
+              return prev;
+            }
+            return [...prev, newMessage];
+          });
+        } else {
+          setUnseenMessages((prev) => ({
+            ...prev,
+            [newMessage.groupId]: (prev[newMessage.groupId] || 0) + 1,
+          }));
+        }
       } 
       // Handle Direct Message
       else {
-          if (selectedUser && newMessage.senderId === selectedUser._id) {
-            // newMessage.seen = true; // DB handles this via API call, but UI needs update
-            newMessage.status = "read";
-            setMessages((prevMessages) => [...prevMessages, newMessage]);
-            axios.put(`/api/messages/mark/${selectedUser._id}`);
-          } else {
-            setUnseenMessages((prevUnseenMessages) => ({
-              ...prevUnseenMessages,
-              [newMessage.senderId]: prevUnseenMessages[newMessage.senderId]
-                ? prevUnseenMessages[newMessage.senderId] + 1
-                : 1,
-            }));
-          }
+        if (selectedUser && newMessage.senderId === selectedUser._id) {
+          newMessage.status = "read";
+          setMessages((prevMessages) => {
+            if (prevMessages.some((m) => m._id === newMessage._id || (m.clientMessageId && m.clientMessageId === newMessage.clientMessageId))) {
+              return prevMessages;
+            }
+            return [...prevMessages, newMessage];
+          });
+          axios.put(`/api/messages/mark/${selectedUser._id}`);
+        } else {
+          setUnseenMessages((prevUnseenMessages) => ({
+            ...prevUnseenMessages,
+            [newMessage.senderId]: prevUnseenMessages[newMessage.senderId]
+              ? prevUnseenMessages[newMessage.senderId] + 1
+              : 1,
+          }));
+        }
       }
     });
 

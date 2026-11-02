@@ -56,9 +56,19 @@ const messageSchema = new mongoose.Schema(
       macAlgorithm: { type: String }, // hmac-sha256
       mac: { type: String }, // base64 (encrypt-then-MAC)
     },
+    clientMessageId: {
+      type: String,
+      index: true,
+      sparse: true,
+    },
   },
   { timestamps: true }
 );
+
+// Compound indexes for fast, bounded pagination & conversation queries
+messageSchema.index({ senderId: 1, receiverId: 1, createdAt: -1 });
+messageSchema.index({ receiverId: 1, senderId: 1, status: 1 });
+messageSchema.index({ groupId: 1, createdAt: -1 });
 
 const Message = mongoose.model("Message", messageSchema);
 

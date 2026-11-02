@@ -70,25 +70,9 @@ const server = http.createServer(app);
 
 import redis, { cacheUserSocket, removeUserSocket, getOnlineUsers } from "./lib/redis.js";
 
-// Production-safe CORS policy
-export const isOriginAllowed = (origin) => {
-  if (!origin) return true; // Allow non-browser requests
-  const isProd = process.env.NODE_ENV === "production";
-  if (!isProd) return true; // Allow local dev origins
+import { isOriginAllowed } from "./lib/corsPolicy.js";
+export { isOriginAllowed };
 
-  const configured = [
-    process.env.CLIENT_URL,
-    process.env.FRONTEND_URL,
-  ].filter(Boolean);
-
-  if (configured.length === 0) {
-    return origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:");
-  }
-
-  if (configured.includes(origin)) return true;
-  if (/^https:\/\/[a-zA-Z0-9_-]+\.vercel\.app$/.test(origin)) return true;
-  return false;
-};
 
 const corsOptions = {
   origin: (origin, callback) => {
@@ -103,10 +87,13 @@ const corsOptions = {
   allowedHeaders: ["Content-Type", "token", "Authorization", "x-bypass-ratelimit"],
 };
 
+import { setIO } from "./lib/socket.js";
+
 // Initialise Socket.io with CORS
 export const io = new Server(server, {
   cors: corsOptions,
 });
+setIO(io);
 
 // Socket.io authentication middleware
 io.use((socket, next) => {

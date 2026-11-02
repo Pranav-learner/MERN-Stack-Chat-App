@@ -9,15 +9,18 @@ import {
   getOnlineUsers,
 } from "../../lib/redis.js";
 import { createRateLimiter } from "../../middleware/rateLimiter.js";
-import { isOriginAllowed } from "../../server.js";
+import { isOriginAllowed } from "../../lib/corsPolicy.js";
 import {
   createGroup,
   inviteToGroup,
   getGroupMessages,
   sendGroupMessage,
+  leaveGroup,
+  removeMember,
 } from "../../controllers/groupController.js";
-import { sendMessage } from "../../controllers/messageController.js";
+import { sendMessage, getAllMessages } from "../../controllers/messageController.js";
 import Group from "../../models/Group.model.js";
+import Message from "../../models/Message.model.js";
 
 describe("Security & Core Workflows Regression Suite", () => {
   describe("Task 3: Multi-Socket & Redis Set Tracking", () => {
@@ -314,5 +317,176 @@ describe("Security & Core Workflows Regression Suite", () => {
       assert.equal(responseBody?.user?.email, "safe@example.com");
     });
   });
+
+  describe("Fast Track 2: Message Pagination & Cursor Verification", () => {
+    it("bounds page size and returns messages in chronological order with cursor", async () => {
+      const origFind = Message.find;
+      const origUpdateMany = Message.updateMany;
+      try {
+        const dummyMessages = [
+          { _id: "m3", text: "Three", createdAt: new Date("2026-11-02T10:03:00Z") },
+          { _id: "m2", text: "Two", createdAt: new Date("2026-11-02T10:02:00Z") },
+          { _id: "m1", text: "One", createdAt: new Date("2026-11-02T10:01:00Z") },
+        ];
+
+        Message.find = (filter) => ({
+          sort: () => ({
+            limit: (n) => Promise.resolve(dummyMessages.slice(0, n)),
+          }),
+        });
+        Message.updateMany = async () => ({ modifiedCount: 0 });
+
+        let result = null;
+        const res = {
+          json: (body) => {
+            result = body;
+          },
+        };
+
+        await getAllMessages({
+          params: { id: "user-target" },
+          user: { _id: "user-me" },
+          query: { limit: "2" },
+        }, res);
+
+        assert.equal(result?.success, true);
+        assert.equal(result?.hasMore, true);
+        assert.equal(result?.messages.length, 2);
+        // Chronological order: oldest first
+        assert.equal(result?.messages[0]._id, "m2");
+        assert.equal(result?.messages[1]._id, "m3");
+        assert.ok(result?.nextCursor, "Must return nextCursor when hasMore is true");
+      } finally {
+        Message.find = origFind;
+        Message.updateMany = origUpdateMany;
+      }
+    });
+  });
+
+  describe("Fast Track 2: Delivery Idempotency & Deduplication", () => {
+    it("returns existing message on duplicate clientMessageId without creating duplicates", async () => {
+      const origFindOne = Message.findOne;
+      try {
+        const existingMessage = {
+          _id: "msg-idempotent-001",
+          senderId: "user-alice",
+          receiverId: "user-bob",
+          text: "Idempotent message content",
+          clientMessageId: "idemp-key-xyz-123",
+          status: "delivered",
+        };
+
+        Message.findOne = async (query) => {
+          if (query.clientMessageId === "idemp-key-xyz-123") {
+            return existingMessage;
+          }
+          return null;
+        };
+
+        let statusCode = 0;
+        let result = null;
+        const res = {
+          status: (code) => {
+            statusCode = code;
+            return { json: (b) => { result = b; } };
+          },
+        };
+
+        await sendMessage({
+          params: { id: "user-bob" },
+          user: { _id: "user-alice" },
+          body: {
+            text: "Idempotent message content",
+            clientMessageId: "idemp-key-xyz-123",
+          },
+        }, res);
+
+        assert.equal(statusCode, 200, "Duplicate request must return 200");
+        assert.equal(result?.duplicate, true, "Must flag duplicate: true");
+        assert.equal(result?.message._id, "msg-idempotent-001");
+      } finally {
+        Message.findOne = origFindOne;
+      }
+    });
+  });
+
+  describe("Fast Track 2: Group Membership Lifecycle & Revocation", () => {
+    it("instantly revokes message access and posting when a member leaves or is removed", async () => {
+      const groupData = {
+        _id: "group-lifecycle-1",
+        admin: "admin-user",
+        members: ["admin-user", "leaving-user"],
+        save: async function () { return this; },
+      };
+
+      const origFindById = Group.findById;
+      try {
+        Group.findById = async () => groupData;
+
+        let statusCode = 0;
+        let result = null;
+        const res = {
+          status: (code) => {
+            statusCode = code;
+            return { json: (b) => { result = b; } };
+          },
+        };
+
+        // User leaves group
+        await leaveGroup({
+          body: { groupId: "group-lifecycle-1" },
+          user: { _id: "leaving-user" },
+        }, res);
+        assert.equal(statusCode, 200);
+        assert.ok(!groupData.members.includes("leaving-user"), "User must be removed from members list");
+
+        // Immediately attempt to read group messages
+        statusCode = 0;
+        await getGroupMessages({
+          params: { groupId: "group-lifecycle-1" },
+          user: { _id: "leaving-user" },
+          query: {},
+        }, res);
+        assert.equal(statusCode, 403, "Removed member must be rejected from reading with 403");
+
+        // Immediately attempt to post group message
+        statusCode = 0;
+        await sendGroupMessage({
+          params: { groupId: "group-lifecycle-1" },
+          user: { _id: "leaving-user" },
+          body: { text: "Sneaking in" },
+        }, res);
+        assert.equal(statusCode, 403, "Removed member must be rejected from writing with 403");
+      } finally {
+        Group.findById = origFindById;
+      }
+    });
+  });
+
+  describe("Fast Track 2: Media Upload Validation", () => {
+    it("rejects image payloads exceeding 5MB limit with HTTP 400", async () => {
+      let statusCode = 0;
+      let result = null;
+      const res = {
+        status: (code) => {
+          statusCode = code;
+          return { json: (b) => { result = b; } };
+        },
+      };
+
+      // Oversized base64 string (> 7MB)
+      const hugeImage = "data:image/jpeg;base64," + "A".repeat(8 * 1024 * 1024);
+
+      await sendMessage({
+        params: { id: "user-bob" },
+        user: { _id: "user-alice" },
+        body: { image: hugeImage },
+      }, res);
+
+      assert.equal(statusCode, 400, "Oversized upload must return 400");
+      assert.match(result?.message, /exceeds maximum allowed size/);
+    });
+  });
 });
+
 
