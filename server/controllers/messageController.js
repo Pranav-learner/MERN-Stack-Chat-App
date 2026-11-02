@@ -2,7 +2,7 @@ import User from "../models/User.model.js";
 import Message from "../models/Message.model.js";
 import cloudinary from "../lib/cloudinary.js";
 import { io } from "../server.js";
-import { getUserSocket } from "../lib/redis.js"; // Import Redis helper
+import { getUserSocket, getUserSockets } from "../lib/redis.js"; // Import Redis helpers
 // Layer 4 · Sprint 5 — Secure Session Integration: route sends through the session-aware
 // message pipeline (resolve → validate → prepare secure payload → transport). Additive;
 // PERMISSIVE by default so existing messaging keeps working when no session exists.
@@ -50,6 +50,16 @@ export const sendMessage = async (req, res) => {
     const receiverId = req.params.id;
     const senderId = req.user._id;
 
+    // Validate recipient
+    if (!receiverId || String(receiverId) === String(senderId)) {
+      return res.status(400).json({ success: false, message: "Invalid recipient" });
+    }
+
+    // Validate message content
+    if (!securePayload && (!text || !text.trim()) && !image) {
+      return res.status(400).json({ success: false, message: "Message must contain text or image" });
+    }
+
     // === End-to-end encrypted path (Layer 4 · Sprint 6) ===================
     // The client encrypted the message with its device-local session keys. The
     // server is a RELAY: it validates the ciphertext's structure/binding, persists
@@ -71,14 +81,15 @@ export const sendMessage = async (req, res) => {
         },
       });
 
-      const receiverSocketId = await getUserSocket(receiverId);
-      if (receiverSocketId) {
-        io.to(receiverSocketId).emit("newMessage", newMessage); // delivers ciphertext
+      const receiverSocketIds = await getUserSockets(receiverId);
+      if (receiverSocketIds.length > 0) {
+        receiverSocketIds.forEach((sid) => io.to(sid).emit("newMessage", newMessage));
         newMessage.status = "delivered";
         await newMessage.save();
-        const senderSocketId = await getUserSocket(senderId);
-        if (senderSocketId) io.to(senderSocketId).emit("messageStatusUpdate", newMessage);
       }
+      const senderSocketIds = await getUserSockets(senderId);
+      senderSocketIds.forEach((sid) => io.to(sid).emit("messageStatusUpdate", newMessage));
+
       return res.status(201).json({ success: true, message: newMessage, encrypted: true });
     }
 
@@ -93,12 +104,11 @@ export const sendMessage = async (req, res) => {
 
     // Route the send through the session-aware message pipeline. The transport
     // persists the message (tagged with its PUBLIC session metadata) and emits it —
-    // the existing delivery behaviour, now session-aware. In Layer 5 the same pipeline
-    // will seal the payload via the encryption interceptor with zero controller change.
+    // the existing delivery behaviour, now session-aware.
     const { context, delivery: newMessage } = await messagePipeline.process({
       sender: String(senderId),
       recipient: String(receiverId),
-      message: { text, image: imageUrl },
+      message: { text: text ? text.trim() : undefined, image: imageUrl },
       transport: async (envelope) => {
         const created = await Message.create({
           senderId,
@@ -109,25 +119,24 @@ export const sendMessage = async (req, res) => {
           session: sessionMetadataOf(envelope),
         });
 
-        // Emit to the receiver's socket (unchanged delivery + status logic).
-        const receiverSocketId = await getUserSocket(receiverId);
-        if (receiverSocketId) {
-          io.to(receiverSocketId).emit("newMessage", created);
+        // Emit to all receiver sockets
+        const receiverSocketIds = await getUserSockets(receiverId);
+        if (receiverSocketIds.length > 0) {
+          receiverSocketIds.forEach((sid) => io.to(sid).emit("newMessage", created));
           created.status = "delivered";
           await created.save();
-          const senderSocketId = await getUserSocket(senderId);
-          if (senderSocketId) {
-            io.to(senderSocketId).emit("messageStatusUpdate", created);
-          }
         }
+        const senderSocketIds = await getUserSockets(senderId);
+        senderSocketIds.forEach((sid) => io.to(sid).emit("messageStatusUpdate", created));
+
         return created;
       },
     });
 
     res.status(201).json({ success: true, message: newMessage, session: context });
   } catch (error) {
-    console.log(error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Error in sendMessage controller:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
@@ -136,6 +145,10 @@ export const getAllMessages = async (req, res) => {
   try {
     const userId = req.params.id; // The other user (sender of messages)
     const myId = req.user._id;
+
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "User ID is required" });
+    }
 
     const messages = await Message.find({
       $or: [
@@ -150,45 +163,39 @@ export const getAllMessages = async (req, res) => {
       { status: "read" }
     );
 
-    // If any messages were updated, notify the sender
+    // If any messages were updated, notify all of sender's sockets
     if (updateResult.modifiedCount > 0) {
-        const senderSocketId = await getUserSocket(userId);
-        if (senderSocketId) {
-            io.to(senderSocketId).emit("messagesRead", { readerId: myId });
-        }
+      const senderSocketIds = await getUserSockets(userId);
+      senderSocketIds.forEach((sid) => io.to(sid).emit("messagesRead", { readerId: myId }));
     }
 
     res.json({ success: true, messages });
   } catch (error) {
-    console.log(error);
-    res.status(500).json({ message: error.message });
+    console.error("Error in getAllMessages controller:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 
-// Seen messages for selected user
-
-// Mark messages as read manually (if needed)
+// Mark messages as read manually
 export const markMessageAsSeen = async (req, res) => {
   try {
     const { userId } = req.params; // The sender whose messages I'm reading
     const myId = req.user._id;
 
     const updateResult = await Message.updateMany(
-        { senderId: userId, receiverId: myId, status: { $ne: "read" } }, 
-        { status: "read" }
+      { senderId: userId, receiverId: myId, status: { $ne: "read" } }, 
+      { status: "read" }
     );
 
     if (updateResult.modifiedCount > 0) {
-        const senderSocketId = await getUserSocket(userId);
-        if (senderSocketId) {
-            io.to(senderSocketId).emit("messagesRead", { readerId: myId });
-        }
+      const senderSocketIds = await getUserSockets(userId);
+      senderSocketIds.forEach((sid) => io.to(sid).emit("messagesRead", { readerId: myId }));
     }
 
     res.status(200).json({ success: true, message: "Messages marked as read" });
   } catch (error) {
-    console.log(error);
-    res.status(500).json({ success: false, message: error.message });
+    console.error("Error in markMessageAsSeen controller:", error.message);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 };
 

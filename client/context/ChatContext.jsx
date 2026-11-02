@@ -39,6 +39,8 @@ export const ChatProvider = ({ children }) => {
     }
   };
 
+  const getErrorMsg = (err) => err?.response?.data?.message || err?.message || "An error occurred";
+
   // function to create group
   const createGroup = async (name, invitedUserIds) => {
     try {
@@ -49,94 +51,91 @@ export const ChatProvider = ({ children }) => {
         return true;
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(getErrorMsg(error));
       return false;
     }
   };
 
   const inviteToGroup = async (groupId, userId) => {
-      try {
-          const { data } = await axios.post("/api/groups/invite", { groupId, userId });
-           if(data.success) toast.success(data.message);
-      } catch (error) {
-          toast.error(error.message);
-      }
-  }
+    try {
+      const { data } = await axios.post("/api/groups/invite", { groupId, userId });
+      if (data.success) toast.success(data.message);
+    } catch (error) {
+      toast.error(getErrorMsg(error));
+    }
+  };
 
   const acceptInvite = async (groupId) => {
-      try {
-          const { data } = await axios.post("/api/groups/accept", { groupId });
-           if(data.success) {
-               toast.success(data.message);
-               fetchGroups(); // refresh to update member status
-           }
-      } catch (error) {
-          toast.error(error.message);
+    try {
+      const { data } = await axios.post("/api/groups/accept", { groupId });
+      if (data.success) {
+        toast.success(data.message);
+        fetchGroups(); // refresh to update member status
       }
-  }
+    } catch (error) {
+      toast.error(getErrorMsg(error));
+    }
+  };
 
-    const rejectInvite = async (groupId) => {
-      try {
-          const { data } = await axios.post("/api/groups/reject", { groupId });
-           if(data.success) {
-               toast.success(data.message);
-               fetchGroups(); 
-           }
-      } catch (error) {
-          toast.error(error.message);
+  const rejectInvite = async (groupId) => {
+    try {
+      const { data } = await axios.post("/api/groups/reject", { groupId });
+      if (data.success) {
+        toast.success(data.message);
+        fetchGroups(); 
       }
-  }
+    } catch (error) {
+      toast.error(getErrorMsg(error));
+    }
+  };
 
   // function to messages of selected user OR group
   const getMessages = async (userId) => {
     try {
-      // If we are in group mode, userId is actually groupId. Logic: if selectedGroup is set.
-      // Actually, cleaner to separate or pass a flag. 
-      // Existing usage passes userId.
       const { data } = await axios.get(`api/messages/${userId}`);
       if (data.success) {
         setMessages(data.messages);
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(getErrorMsg(error));
     }
   };
 
   const getGroupMessages = async (groupId) => {
-      setUnseenMessages((prev) => ({ ...prev, [groupId]: 0 }));
-      try {
-          const { data } = await axios.get(`/api/groups/${groupId}/messages`);
-          if (data.success) {
-              setMessages(data.messages);
-          }
-      } catch (error) {
-          toast.error(error.message);
+    setUnseenMessages((prev) => ({ ...prev, [groupId]: 0 }));
+    try {
+      const { data } = await axios.get(`/api/groups/${groupId}/messages`);
+      if (data.success) {
+        setMessages(data.messages);
       }
-  }
+    } catch (error) {
+      toast.error(getErrorMsg(error));
+    }
+  };
 
   // function to send message to selected user or group
   const sendMessage = async (messages) => {
     try {
       if (selectedGroup) {
-          const { data } = await axios.post(`/api/groups/send/${selectedGroup._id}`, messages);
-           if (data.success) {
-               setMessages((prevMessages) => [...prevMessages, data.message]);
-           } else {
-               toast.error(data.message);
-           }
+        const { data } = await axios.post(`/api/groups/send/${selectedGroup._id}`, messages);
+        if (data.success) {
+          setMessages((prevMessages) => [...prevMessages, data.message]);
+        } else {
+          toast.error(data.message);
+        }
       } else if (selectedUser) {
-          const { data } = await axios.post(
-            `api/messages/send/${selectedUser._id}`,
-            messages
-          );
-          if (data.success) {
-            setMessages((prevMessages) => [...prevMessages, data.message]);
-          } else {
-            toast.error(data.message);
-          }
+        const { data } = await axios.post(
+          `api/messages/send/${selectedUser._id}`,
+          messages
+        );
+        if (data.success) {
+          setMessages((prevMessages) => [...prevMessages, data.message]);
+        } else {
+          toast.error(data.message);
+        }
       }
     } catch (error) {
-      toast.error(error.message);
+      toast.error(getErrorMsg(error));
     }
   };
 

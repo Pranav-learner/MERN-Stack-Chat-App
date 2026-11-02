@@ -3,6 +3,8 @@ import dotenv from "dotenv/config";
 import cors from "cors";
 import http from "http";
 import mongoose from "mongoose";
+import jwt from "jsonwebtoken";
+import { fileURLToPath } from "url";
 import { connectDB } from "./lib/db.js";
 import userRouter from "./routes/userRoute.js";
 import messageRouter from "./routes/messageRoute.js";
@@ -68,16 +70,78 @@ const server = http.createServer(app);
 
 import redis, { cacheUserSocket, removeUserSocket, getOnlineUsers } from "./lib/redis.js";
 
-// Intialise Socket.io
-export const io = new Server(server, {
-  cors: {
-    origin: "*",
+// Production-safe CORS policy
+export const isOriginAllowed = (origin) => {
+  if (!origin) return true; // Allow non-browser requests
+  const isProd = process.env.NODE_ENV === "production";
+  if (!isProd) return true; // Allow local dev origins
+
+  const configured = [
+    process.env.CLIENT_URL,
+    process.env.FRONTEND_URL,
+  ].filter(Boolean);
+
+  if (configured.length === 0) {
+    return origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:");
+  }
+
+  if (configured.includes(origin)) return true;
+  if (/^https:\/\/[a-zA-Z0-9_-]+\.vercel\.app$/.test(origin)) return true;
+  return false;
+};
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (isOriginAllowed(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("CORS policy violation: Origin not allowed"));
+    }
   },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "token", "Authorization", "x-bypass-ratelimit"],
+};
+
+// Initialise Socket.io with CORS
+export const io = new Server(server, {
+  cors: corsOptions,
+});
+
+// Socket.io authentication middleware
+io.use((socket, next) => {
+  const token =
+    socket.handshake.auth?.token ||
+    socket.handshake.headers?.token ||
+    socket.handshake.headers?.authorization;
+  const rawToken = token?.startsWith("Bearer ") ? token.slice(7) : token;
+  const queryUserId = socket.handshake.query?.userId;
+
+  if (rawToken && process.env.JWT_SECRET) {
+    try {
+      const decoded = jwt.verify(rawToken, process.env.JWT_SECRET);
+      socket.userId = decoded.id;
+      if (queryUserId && String(queryUserId) !== String(decoded.id)) {
+        return next(new Error("Authentication failed: User ID mismatch"));
+      }
+      return next();
+    } catch {
+      return next(new Error("Authentication failed: Invalid token"));
+    }
+  }
+
+  // In non-production environments or test suites without JWT, allow query.userId fallback
+  if (process.env.NODE_ENV !== "production" && queryUserId) {
+    socket.userId = queryUserId;
+    return next();
+  }
+
+  return next(new Error("Authentication required: Missing token"));
 });
 
 // Socket.io connection handler
 io.on("connection", async (socket) => {
-  const userId = socket.handshake.query.userId;
+  const userId = socket.userId || socket.handshake.query.userId;
 
   if (userId) {
     await cacheUserSocket(userId, socket.id);
@@ -155,7 +219,7 @@ io.on("connection", async (socket) => {
 
   socket.on("disconnect", async () => {
     if (userId) {
-      await removeUserSocket(userId);
+      await removeUserSocket(userId, socket.id);
       const onlineUsers = await getOnlineUsers();
       io.emit("onlineUsers", onlineUsers);
 
@@ -184,7 +248,7 @@ for (const type of [PresenceEventType.ONLINE, PresenceEventType.OFFLINE, Presenc
   });
 }
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json({ limit: "10mb" }));
 
 // Health check and status endpoints
@@ -419,6 +483,16 @@ app.use("/api/optimization", optimizationRouter);
 // by wrapping operations at the call site, WITHOUT modifying any lower layer. Completes + FREEZES Layer 12.
 app.use("/api/fabric-reliability", fabricReliabilityRouter);
 
+// Global error handling middleware - prevents leaking internal details or stack traces
+app.use((err, _req, res, _next) => {
+  console.error("Server error:", err?.message || err);
+  const status = err?.status || (err?.message?.includes("CORS") ? 403 : 500);
+  res.status(status).json({
+    success: false,
+    message: process.env.NODE_ENV === "production" && status === 500 ? "Internal server error" : (err?.message || "Internal server error"),
+  });
+});
+
 // Connect to MongoDB
 console.log("Attempting to connect to MongoDB...");
 await connectDB();
@@ -459,9 +533,15 @@ console.log("Connection reliability heartbeat monitor started.");
 const PORT = process.env.PORT || 5000;
 console.log(`Checking PORT: ${PORT}`);
 
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+const isDirectRun = Boolean(
+  process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]
+);
+
+if (isDirectRun && process.env.NODE_ENV !== "test" && !process.env.DISABLE_SERVER_LISTEN) {
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}
 
 process.on("unhandledRejection", (err) => {
   console.error("Unhandled Promise Rejection:", err);

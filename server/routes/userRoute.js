@@ -6,11 +6,12 @@ import {
   isAuthenticated,
 } from "../controllers/userController.js";
 import { protectedRoute } from "../middleware/authmiddleware.js";
+import { authLimiter } from "../middleware/rateLimiter.js";
 
 const userRouter = express.Router();
 
-userRouter.post("/signup", signup);
-userRouter.post("/login", login);
+userRouter.post("/signup", authLimiter, signup);
+userRouter.post("/login", authLimiter, login);
 userRouter.put("/update-profile", protectedRoute, updateProfile);
 userRouter.get("/check", protectedRoute, isAuthenticated);
 

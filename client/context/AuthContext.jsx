@@ -73,7 +73,8 @@ export const AuthProvider = ({ children }) => {
         toast.error(data.message);
       }
     } catch (error) {
-      toast.error(error.message);
+      const msg = error.response?.data?.message || error.message;
+      toast.error(msg);
     }
   };
 
@@ -112,7 +113,8 @@ export const AuthProvider = ({ children }) => {
         toast.success("Profile updated successfully");
       }
     } catch (error) {
-      toast.error(error.message);
+      const msg = error.response?.data?.message || error.message;
+      toast.error(msg);
     }
   };
 

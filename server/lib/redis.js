@@ -32,39 +32,84 @@ if (redisUrl) {
 }
 
 // Helper functions for User Socket Management with resilient in-memory fallback
+// and multi-socket per user tracking
 
 export const cacheUserSocket = async (userId, socketId) => {
-  memoryUserSockets.set(String(userId), String(socketId));
+  const uid = String(userId);
+  const sid = String(socketId);
+
+  // In-memory tracking
+  if (!memoryUserSockets.has(uid)) {
+    memoryUserSockets.set(uid, new Set());
+  }
+  memoryUserSockets.get(uid).add(sid);
+
+  // Redis tracking
   if (redis && redis.status === "ready") {
     try {
-      await redis.set(`user:${userId}`, socketId);
-      await redis.sadd("online_users", String(userId));
+      await redis.sadd(`user_sockets:${uid}`, sid);
+      await redis.sadd("online_users", uid);
     } catch {
-      // In-memory fallback retains the socket mapping
+      // In-memory fallback retains socket mapping
     }
   }
+};
+
+export const getUserSockets = async (userId) => {
+  const uid = String(userId);
+  if (redis && redis.status === "ready") {
+    try {
+      const sockets = await redis.smembers(`user_sockets:${uid}`);
+      if (sockets && sockets.length > 0) return sockets;
+    } catch {
+      // In-memory fallback
+    }
+  }
+  const set = memoryUserSockets.get(uid);
+  return set ? Array.from(set) : [];
 };
 
 export const getUserSocket = async (userId) => {
-  if (redis && redis.status === "ready") {
-    try {
-      const sock = await redis.get(`user:${userId}`);
-      if (sock) return sock;
-    } catch {
-      // In-memory fallback
-    }
-  }
-  return memoryUserSockets.get(String(userId)) || null;
+  const sockets = await getUserSockets(userId);
+  return sockets.length > 0 ? sockets[0] : null;
 };
 
-export const removeUserSocket = async (userId) => {
-  memoryUserSockets.delete(String(userId));
-  if (redis && redis.status === "ready") {
-    try {
-      await redis.del(`user:${userId}`);
-      await redis.srem("online_users", String(userId));
-    } catch {
-      // In-memory fallback
+export const removeUserSocket = async (userId, socketId = null) => {
+  const uid = String(userId);
+
+  if (socketId) {
+    const sid = String(socketId);
+    // Remove specific socket
+    const set = memoryUserSockets.get(uid);
+    if (set) {
+      set.delete(sid);
+      if (set.size === 0) {
+        memoryUserSockets.delete(uid);
+      }
+    }
+
+    if (redis && redis.status === "ready") {
+      try {
+        await redis.srem(`user_sockets:${uid}`, sid);
+        const remaining = await redis.scard(`user_sockets:${uid}`);
+        if (remaining === 0) {
+          await redis.srem("online_users", uid);
+        }
+      } catch {
+        // In-memory fallback
+      }
+    }
+  } else {
+    // Remove all sockets for this user
+    memoryUserSockets.delete(uid);
+
+    if (redis && redis.status === "ready") {
+      try {
+        await redis.del(`user_sockets:${uid}`);
+        await redis.srem("online_users", uid);
+      } catch {
+        // In-memory fallback
+      }
     }
   }
 };
@@ -74,8 +119,6 @@ export const getOnlineUsers = async () => {
     try {
       const members = await redis.smembers("online_users");
       if (members && members.length > 0) return members;
-      const keys = await redis.keys("user:*");
-      if (keys.length > 0) return keys.map((key) => key.split(":")[1]);
     } catch {
       // In-memory fallback
     }
@@ -84,4 +127,5 @@ export const getOnlineUsers = async () => {
 };
 
 export default redis;
+
 
