@@ -554,3 +554,358 @@ export async function decryptMessageList(messages, myUserId, peerUser, axiosInst
   }
   return results;
 }
+
+// --- Milestone 3: Group Chat End-to-End Encryption (Group Keys) --------------
+
+const groupKeyCache = new Map(); // groupId -> { groupKeyBytes, epoch }
+
+export function clearGroupKeyCache(groupId) {
+  if (groupId) {
+    groupKeyCache.delete(String(groupId));
+  } else {
+    groupKeyCache.clear();
+  }
+}
+
+/**
+ * Derive group-specific AES and MAC keys from raw group key bytes via HKDF.
+ */
+async function deriveGroupSubkeys(groupKeyBytes, groupId) {
+  const salt = enc.encode(`MERN-Group-Salt-v1:${groupId}`);
+  const info = enc.encode(`Group-E2EE-Subkeys-v1:${groupId}`);
+
+  const hkdfKey = await crypto.subtle.importKey("raw", groupKeyBytes, "HKDF", false, ["deriveBits"]);
+  const derivedBytes = new Uint8Array(
+    await crypto.subtle.deriveBits(
+      { name: "HKDF", hash: "SHA-256", salt, info },
+      hkdfKey,
+      64 * 8
+    )
+  );
+
+  return {
+    encKeyBytes: derivedBytes.slice(0, 32),
+    macKeyBytes: derivedBytes.slice(32, 64),
+  };
+}
+
+/**
+ * Retrieve or establish the shared group symmetric key for a group.
+ */
+export async function getOrEstablishGroupKey(groupId, group, myUserId, axios) {
+  if (!groupId || !myUserId) return null;
+  const gid = String(groupId);
+
+  if (groupKeyCache.has(gid)) {
+    return groupKeyCache.get(gid);
+  }
+
+  // Check localStorage cache
+  const localKey = `securechat.groupkey.v1.${gid}`;
+  try {
+    const cachedStr = localStorage.getItem(localKey);
+    if (cachedStr) {
+      const parsed = JSON.parse(cachedStr);
+      if (parsed.keyB64) {
+        const item = { groupKeyBytes: fromBase64(parsed.keyB64), epoch: parsed.epoch || 1 };
+        groupKeyCache.set(gid, item);
+        return item;
+      }
+    }
+  } catch {}
+
+  // Fetch group key records from backend
+  let groupE2ee = group?.e2ee;
+  if (!groupE2ee?.encryptedKeys || groupE2ee.encryptedKeys.length === 0) {
+    try {
+      const { data } = await axios.get(`/api/groups/${gid}/keys`);
+      if (data.success && data.e2ee) {
+        groupE2ee = data.e2ee;
+      }
+    } catch (err) {
+      console.warn("[e2ee] Failed to fetch group keys:", err?.message);
+    }
+  }
+
+  // Look for our encrypted group key
+  const myKeyRecord = groupE2ee?.encryptedKeys?.find(
+    (k) => String(k.userId?._id || k.userId) === String(myUserId)
+  );
+
+  if (myKeyRecord) {
+    try {
+      const senderId = String(myKeyRecord.senderId?._id || myKeyRecord.senderId);
+      const senderUser = group?.members?.find((m) => String(m._id) === senderId) || { _id: senderId };
+
+      const session = await getOrDeriveSession(myUserId, senderUser);
+      if (session) {
+        const aesKey = await crypto.subtle.importKey("raw", session.encKeyBits, "AES-GCM", false, ["decrypt"]);
+        const combined = concatBytes(fromBase64(myKeyRecord.encryptedKey), fromBase64(myKeyRecord.tag));
+        const decryptedKeyBuf = await crypto.subtle.decrypt(
+          { name: "AES-GCM", iv: fromBase64(myKeyRecord.iv), tagLength: 128 },
+          aesKey,
+          combined
+        );
+
+        const groupKeyBytes = new Uint8Array(decryptedKeyBuf);
+        const item = { groupKeyBytes, epoch: myKeyRecord.epoch || 1 };
+        groupKeyCache.set(gid, item);
+        try {
+          localStorage.setItem(localKey, JSON.stringify({ keyB64: toBase64(groupKeyBytes), epoch: item.epoch }));
+        } catch {}
+        return item;
+      }
+    } catch (decryptErr) {
+      console.error("[e2ee] Failed to decrypt group key record:", decryptErr);
+    }
+  }
+
+  // If no record exists, establish a fresh group key
+  try {
+    const rawGroupKey = crypto.getRandomValues(new Uint8Array(32));
+    const keyHashBuf = await crypto.subtle.digest("SHA-256", rawGroupKey);
+    const keyFingerprint = bytesToHex(new Uint8Array(keyHashBuf));
+
+    const encryptedKeys = [];
+    const members = Array.isArray(group?.members) ? group.members : [];
+
+    for (const member of members) {
+      const memberId = String(member._id || member);
+      const memberObj = typeof member === "object" ? member : { _id: memberId };
+
+      try {
+        const session = await getOrDeriveSession(myUserId, memberObj);
+        if (session) {
+          const aesKey = await crypto.subtle.importKey("raw", session.encKeyBits, "AES-GCM", false, ["encrypt"]);
+          const iv = crypto.getRandomValues(new Uint8Array(12));
+          const encryptedBuf = await crypto.subtle.encrypt(
+            { name: "AES-GCM", iv, tagLength: 128 },
+            aesKey,
+            rawGroupKey
+          );
+
+          const encryptedBytes = new Uint8Array(encryptedBuf);
+          const ciphertext = encryptedBytes.subarray(0, encryptedBytes.length - 16);
+          const tag = encryptedBytes.subarray(encryptedBytes.length - 16);
+
+          encryptedKeys.push({
+            userId: memberId,
+            encryptedKey: toBase64(ciphertext),
+            iv: toBase64(iv),
+            tag: toBase64(tag),
+            senderId: myUserId,
+            epoch: 1,
+          });
+        }
+      } catch (encMemberErr) {
+        console.warn(`[e2ee] Failed to encrypt group key for member ${memberId}:`, encMemberErr);
+      }
+    }
+
+    if (encryptedKeys.length > 0) {
+      await axios.post(`/api/groups/${gid}/keys`, {
+        epoch: 1,
+        keyFingerprint,
+        encryptedKeys,
+      });
+    }
+
+    const item = { groupKeyBytes: rawGroupKey, epoch: 1 };
+    groupKeyCache.set(gid, item);
+    try {
+      localStorage.setItem(localKey, JSON.stringify({ keyB64: toBase64(rawGroupKey), epoch: 1 }));
+    } catch {}
+    return item;
+  } catch (estErr) {
+    console.error("[e2ee] Failed to establish fresh group key:", estErr);
+    return null;
+  }
+}
+
+/**
+ * Encrypt a group message using the group's symmetric key.
+ */
+export async function encryptGroupMessage(groupId, messagePayload, myUserId, group, axios) {
+  const groupKeyRecord = await getOrEstablishGroupKey(groupId, group, myUserId, axios);
+  if (!groupKeyRecord?.groupKeyBytes) {
+    return null;
+  }
+
+  const { encKeyBytes, macKeyBytes } = await deriveGroupSubkeys(groupKeyRecord.groupKeyBytes, groupId);
+
+  const meta = {
+    v: 1,
+    payloadVersion: 1,
+    type: "message",
+    protocolVersion: "1.0",
+    sessionId: `grp_${groupId}_ep${groupKeyRecord.epoch}`,
+    keyId: `grpkey_${groupId}`,
+    senderDevice: "web-client",
+    receiverDevice: "",
+    timestamp: Date.now(),
+    nonce: randomHex(16),
+  };
+
+  const aad = buildCanonicalAAD(meta);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+
+  const aesKey = await crypto.subtle.importKey("raw", encKeyBytes, "AES-GCM", false, ["encrypt"]);
+  const plaintext = enc.encode(JSON.stringify(messagePayload || {}));
+
+  const sealed = new Uint8Array(
+    await crypto.subtle.encrypt(
+      { name: "AES-GCM", iv, additionalData: aad, tagLength: 128 },
+      aesKey,
+      plaintext
+    )
+  );
+
+  const ciphertext = sealed.subarray(0, sealed.length - 16);
+  const tag = sealed.subarray(sealed.length - 16);
+
+  // Encrypt-then-MAC
+  const hmacKey = await crypto.subtle.importKey("raw", macKeyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const hmacInput = concatBytes(aad, iv, ciphertext, tag);
+  const mac = new Uint8Array(await crypto.subtle.sign("HMAC", hmacKey, hmacInput));
+
+  const securePayload = {
+    ...meta,
+    encryption: {
+      algorithm: "aes-256-gcm",
+      iv: toBase64(iv),
+      ciphertext: toBase64(ciphertext),
+      tag: toBase64(tag),
+    },
+    integrity: {
+      algorithm: "hmac-sha256",
+      mac: toBase64(mac),
+    },
+    ratchet: null,
+  };
+
+  return {
+    securePayload,
+    sessionId: meta.sessionId,
+  };
+}
+
+/**
+ * Decrypt an incoming group message.
+ */
+export async function decryptGroupMessage(messageDoc, myUserId, group, axios) {
+  if (!messageDoc?.secure?.encrypted) {
+    return {
+      text: messageDoc?.text,
+      image: messageDoc?.image,
+      media: messageDoc?.media,
+      isEncrypted: false,
+    };
+  }
+
+  const groupId = messageDoc.groupId?._id || messageDoc.groupId;
+  const groupKeyRecord = await getOrEstablishGroupKey(groupId, group, myUserId, axios);
+
+  if (!groupKeyRecord?.groupKeyBytes) {
+    return {
+      text: "🔒 [End-to-End Encrypted Group Message - Waiting for key exchange]",
+      image: null,
+      media: null,
+      isEncrypted: true,
+      pendingKey: true,
+    };
+  }
+
+  const s = messageDoc.secure;
+
+  try {
+    const { encKeyBytes, macKeyBytes } = await deriveGroupSubkeys(groupKeyRecord.groupKeyBytes, groupId);
+
+    const meta = {
+      v: s.v || 1,
+      payloadVersion: s.payloadVersion || 1,
+      type: s.type || "message",
+      protocolVersion: s.protocolVersion || "1.0",
+      sessionId: s.sessionId,
+      keyId: s.keyId,
+      senderDevice: s.senderDevice || "",
+      receiverDevice: s.receiverDevice || "",
+      timestamp: s.timestamp || (messageDoc.createdAt ? new Date(messageDoc.createdAt).getTime() : Date.now()),
+      nonce: s.nonce,
+    };
+
+    const aad = buildCanonicalAAD(meta);
+    const iv = fromBase64(s.iv);
+    const ciphertext = fromBase64(s.ciphertext);
+    const tag = fromBase64(s.tag);
+    const givenMac = fromBase64(s.mac);
+
+    // 1. Verify HMAC
+    const hmacKey = await crypto.subtle.importKey("raw", macKeyBytes, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const hmacInput = concatBytes(aad, iv, ciphertext, tag);
+    const expectedMac = new Uint8Array(await crypto.subtle.sign("HMAC", hmacKey, hmacInput));
+
+    if (!timingSafeEqual(expectedMac, givenMac)) {
+      throw new Error("Group message integrity check failed: HMAC mismatch");
+    }
+
+    // 2. Decrypt AES-GCM
+    const aesKey = await crypto.subtle.importKey("raw", encKeyBytes, "AES-GCM", false, ["decrypt"]);
+    const combined = concatBytes(ciphertext, tag);
+    const decryptedBytes = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv, additionalData: aad, tagLength: 128 },
+      aesKey,
+      combined
+    );
+
+    const decrypted = JSON.parse(dec.decode(decryptedBytes));
+    return {
+      text: decrypted.text || "",
+      image: decrypted.image || null,
+      media: decrypted.media || null,
+      isEncrypted: true,
+    };
+  } catch (error) {
+    console.error("[e2ee] Group decryption failure:", error.message);
+    return {
+      text: "⚠️ [Decryption Failed: Group message corrupted]",
+      image: null,
+      media: null,
+      isEncrypted: true,
+      failed: true,
+    };
+  }
+}
+
+/**
+ * Decrypt a list of group messages, resolving any attached secure media.
+ */
+export async function decryptGroupMessageList(messages, myUserId, group, axiosInstance = null) {
+  if (!Array.isArray(messages)) return [];
+  const results = [];
+  for (const msg of messages) {
+    if (msg.secure?.encrypted) {
+      const decrypted = await decryptGroupMessage(msg, myUserId, group, axiosInstance);
+      let resolvedImage = decrypted.image;
+
+      if (!resolvedImage && decrypted.media && axiosInstance) {
+        resolvedImage = await fetchAndDecryptMedia(axiosInstance, decrypted.media);
+      }
+
+      results.push({
+        ...msg,
+        text: decrypted.text,
+        image: resolvedImage,
+        media: decrypted.media,
+        isEncrypted: decrypted.isEncrypted,
+        failed: decrypted.failed,
+      });
+    } else {
+      results.push({
+        ...msg,
+        isEncrypted: false,
+      });
+    }
+  }
+  return results;
+}
+

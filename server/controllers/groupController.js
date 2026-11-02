@@ -2,6 +2,8 @@ import Group from "../models/Group.model.js";
 import Message from "../models/Message.model.js";
 import { io } from "../lib/socket.js";
 import { getUserSockets } from "../lib/redis.js";
+import { relayManager } from "./secureTransportController.js";
+import { toStoredCiphertext } from "../secure-transport/index.js";
 
 export const createGroup = async (req, res) => {
   try {
@@ -249,12 +251,12 @@ export const getGroupMessages = async (req, res) => {
 
 export const sendGroupMessage = async (req, res) => {
   try {
-    const { text, image, clientMessageId } = req.body;
+    const { text, image, securePayload, clientMessageId } = req.body;
     const { groupId } = req.params;
     const senderId = req.user._id;
 
     // Validate payload
-    if ((!text || !text.trim()) && !image) {
+    if (!securePayload && (!text || !text.trim()) && !image) {
       return res.status(400).json({ success: false, message: "Message must contain text or image" });
     }
 
@@ -283,6 +285,36 @@ export const sendGroupMessage = async (req, res) => {
       }
     }
 
+    // === Milestone 3: End-to-End Encrypted Group Message path ===
+    if (securePayload) {
+      const { payload } = relayManager.relay(securePayload, { sessionId: req.body?.sessionId || groupId });
+      const stored = toStoredCiphertext(payload, { senderId });
+      const newMessage = new Message({
+        senderId,
+        groupId,
+        status: "sent",
+        clientMessageId: clientMessageId || undefined,
+        secure: stored.secure,
+        session: {
+          sessionId: payload.sessionId,
+          keyId: payload.keyId,
+          secured: true,
+          transportMode: "session",
+          fallback: false,
+        },
+      });
+
+      await newMessage.save();
+      await newMessage.populate("senderId", "fullName profilePic");
+
+      if (io) {
+        io.to(groupId.toString()).emit("newMessage", newMessage);
+      }
+
+      return res.status(201).json({ success: true, message: newMessage, encrypted: true });
+    }
+
+    // === Plaintext fallback path ===
     let imageUrl = image || undefined;
     if (image && typeof image === "string" && image.startsWith("data:image")) {
       try {
@@ -367,4 +399,95 @@ export const removeMember = async (req, res) => {
     res.status(500).json({ success: false, message: "Internal Server Error" });
   }
 };
+
+// === Milestone 3: Group Key Distribution & Synchronization ===
+
+export const getGroupKeys = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const userId = req.user._id;
+
+    const group = await Group.findById(groupId);
+    if (!group) return res.status(404).json({ success: false, message: "Group not found" });
+
+    const isMember = group.members.some((id) => id.toString() === userId.toString());
+    if (!isMember) {
+      return res.status(403).json({ success: false, message: "Access denied: you are not a member of this group" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      e2ee: group.e2ee || { enabled: true, epoch: 1, keyFingerprint: "", encryptedKeys: [] },
+    });
+  } catch (error) {
+    console.error("Error in getGroupKeys:", error.message);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+};
+
+export const updateGroupKeys = async (req, res) => {
+  try {
+    const { groupId } = req.params;
+    const { epoch, keyFingerprint, encryptedKeys } = req.body;
+    const userId = req.user._id;
+
+    const group = await Group.findById(groupId);
+    if (!group) return res.status(404).json({ success: false, message: "Group not found" });
+
+    const isMember = group.members.some((id) => id.toString() === userId.toString());
+    if (!isMember) {
+      return res.status(403).json({ success: false, message: "Access denied: you are not a member of this group" });
+    }
+
+    if (!group.e2ee) {
+      group.e2ee = { enabled: true, epoch: 1, keyFingerprint: "", encryptedKeys: [] };
+    }
+
+    if (epoch) group.e2ee.epoch = epoch;
+    if (keyFingerprint) group.e2ee.keyFingerprint = keyFingerprint;
+
+    if (Array.isArray(encryptedKeys)) {
+      for (const k of encryptedKeys) {
+        const existingIdx = group.e2ee.encryptedKeys.findIndex(
+          (item) => item.userId.toString() === k.userId.toString()
+        );
+        if (existingIdx !== -1) {
+          group.e2ee.encryptedKeys[existingIdx] = {
+            userId: k.userId,
+            encryptedKey: k.encryptedKey,
+            iv: k.iv,
+            tag: k.tag,
+            senderId: userId,
+            epoch: epoch || group.e2ee.epoch,
+          };
+        } else {
+          group.e2ee.encryptedKeys.push({
+            userId: k.userId,
+            encryptedKey: k.encryptedKey,
+            iv: k.iv,
+            tag: k.tag,
+            senderId: userId,
+            epoch: epoch || group.e2ee.epoch,
+          });
+        }
+      }
+    }
+
+    await group.save();
+
+    if (io) {
+      io.to(groupId.toString()).emit("groupKeysUpdated", {
+        groupId,
+        epoch: group.e2ee.epoch,
+        keyFingerprint: group.e2ee.keyFingerprint,
+      });
+    }
+
+    return res.status(200).json({ success: true, e2ee: group.e2ee });
+  } catch (error) {
+    console.error("Error in updateGroupKeys:", error.message);
+    res.status(500).json({ success: false, message: "Internal Server Error" });
+  }
+};
+
 

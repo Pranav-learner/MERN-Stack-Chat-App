@@ -98,7 +98,12 @@ const ChatContainer = () => {
             )
           )}
           {selectedGroup && (
+            <>
               <span className="text-xs text-gray-400 ml-2">({selectedGroup.members.length} members)</span>
+              <span className="text-[11px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full flex items-center gap-1 font-normal ml-2">
+                <span>🔒</span> Group Encrypted
+              </span>
+            </>
           )}
         </p>
         <img
@@ -204,7 +209,7 @@ const ChatContainer = () => {
             value={input}
             onKeyDown={(e) => (e.key === "Enter" ? handleSendMessage(e) : null)}
             type="text"
-            placeholder={selectedUser?.publicKey ? "🔒 Send encrypted message..." : "Send a message"}
+            placeholder={selectedUser ? (selectedUser.publicKey ? "🔒 Send encrypted message..." : "Send a message") : "🔒 Send encrypted group message..."}
             className="flex-1 text-sm p-3 border-none rounded-lg outline-none text-white placeholder-gray-400"
           />
           <input

@@ -9,6 +9,9 @@ import {
   uploadEncryptedMedia,
   cacheMediaUrl,
   fetchAndDecryptMedia,
+  encryptGroupMessage,
+  decryptGroupMessage,
+  decryptGroupMessageList,
 } from "../src/lib/e2eeService";
 
 export const ChatContext = createContext();
@@ -121,7 +124,11 @@ export const ChatProvider = ({ children }) => {
     try {
       const { data } = await axios.get(`/api/groups/${groupId}/messages`);
       if (data.success) {
-        setMessages(data.messages);
+        const currentGrp = (selectedGroup && selectedGroup._id === groupId)
+          ? selectedGroup
+          : groups.find((g) => g._id === groupId);
+        const decryptedList = await decryptGroupMessageList(data.messages, authUser?._id, currentGrp, axios);
+        setMessages(decryptedList);
       }
     } catch (error) {
       toast.error(getErrorMsg(error));
@@ -134,14 +141,71 @@ export const ChatProvider = ({ children }) => {
       const clientMessageId = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
 
       if (selectedGroup) {
-        const payload = { ...messagePayload, clientMessageId };
-        const { data } = await axios.post(`/api/groups/send/${selectedGroup._id}`, payload);
+        let sendPayload = { ...messagePayload, clientMessageId };
+        let wasEncrypted = false;
+        let displayedImage = messagePayload.image;
+
+        try {
+          let preparedPayload = { text: messagePayload.text };
+
+          if (messagePayload.file) {
+            const encryptedMedia = await encryptMediaFile(messagePayload.file);
+            const mediaDoc = await uploadEncryptedMedia(axios, encryptedMedia, null);
+
+            if (displayedImage) {
+              cacheMediaUrl(mediaDoc.mediaId, displayedImage);
+            }
+
+            preparedPayload.media = {
+              mediaId: mediaDoc.mediaId,
+              mediaKey: encryptedMedia.mediaKeyB64,
+              iv: encryptedMedia.ivB64,
+              authTag: encryptedMedia.authTagB64,
+              filename: encryptedMedia.filename,
+              contentType: encryptedMedia.contentType,
+              size: encryptedMedia.plaintextSize,
+              plaintextHash: encryptedMedia.plaintextHash,
+            };
+          } else if (messagePayload.image) {
+            preparedPayload.image = messagePayload.image;
+          }
+
+          const encryptedGroupRes = await encryptGroupMessage(
+            selectedGroup._id,
+            preparedPayload,
+            authUser?._id,
+            selectedGroup,
+            axios
+          );
+
+          if (encryptedGroupRes?.securePayload) {
+            sendPayload = {
+              securePayload: encryptedGroupRes.securePayload,
+              sessionId: encryptedGroupRes.sessionId,
+              clientMessageId,
+            };
+            wasEncrypted = true;
+          }
+        } catch (encGroupErr) {
+          console.warn("[e2ee] Group encryption error, sending via fallback:", encGroupErr);
+        }
+
+        const { data } = await axios.post(`/api/groups/send/${selectedGroup._id}`, sendPayload);
         if (data.success) {
+          const displayedMessage = wasEncrypted
+            ? {
+                ...data.message,
+                text: messagePayload.text,
+                image: displayedImage,
+                isEncrypted: true,
+              }
+            : data.message;
+
           setMessages((prevMessages) => {
             if (prevMessages.some((m) => m._id === data.message._id || (m.clientMessageId && m.clientMessageId === data.message.clientMessageId))) {
               return prevMessages;
             }
-            return [...prevMessages, data.message];
+            return [...prevMessages, displayedMessage];
           });
         } else {
           toast.error(data.message);
@@ -234,11 +298,28 @@ export const ChatProvider = ({ children }) => {
           const senderId = typeof newMessage.senderId === 'object' ? newMessage.senderId._id : newMessage.senderId;
           if (senderId === authUser._id) return;
 
+          let processed = newMessage;
+          if (newMessage.secure?.encrypted) {
+            const decrypted = await decryptGroupMessage(newMessage, authUser?._id, selectedGroup, axios);
+            let resolvedImage = decrypted.image;
+            if (!resolvedImage && decrypted.media) {
+              resolvedImage = await fetchAndDecryptMedia(axios, decrypted.media);
+            }
+            processed = {
+              ...newMessage,
+              text: decrypted.text,
+              image: resolvedImage,
+              media: decrypted.media,
+              isEncrypted: decrypted.isEncrypted,
+              failed: decrypted.failed,
+            };
+          }
+
           setMessages((prev) => {
-            if (prev.some((m) => m._id === newMessage._id || (m.clientMessageId && m.clientMessageId === newMessage.clientMessageId))) {
+            if (prev.some((m) => m._id === processed._id || (m.clientMessageId && m.clientMessageId === processed.clientMessageId))) {
               return prev;
             }
-            return [...prev, newMessage];
+            return [...prev, processed];
           });
         } else {
           setUnseenMessages((prev) => ({

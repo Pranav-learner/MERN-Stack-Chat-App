@@ -10,6 +10,8 @@ import {
   sendGroupMessage,
   leaveGroup,
   removeMember,
+  getGroupKeys,
+  updateGroupKeys,
 } from "../controllers/groupController.js";
 
 const groupRouter = express.Router();
@@ -23,5 +25,7 @@ groupRouter.post("/remove-member", protectedRoute, removeMember);
 groupRouter.get("/my-groups", protectedRoute, getMyGroups);
 groupRouter.get("/:groupId/messages", protectedRoute, getGroupMessages);
 groupRouter.post("/send/:groupId", protectedRoute, sendGroupMessage);
+groupRouter.get("/:groupId/keys", protectedRoute, getGroupKeys);
+groupRouter.post("/:groupId/keys", protectedRoute, updateGroupKeys);
 
 export default groupRouter;
