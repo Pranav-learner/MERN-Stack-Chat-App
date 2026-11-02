@@ -7,13 +7,16 @@ export const isOriginAllowed = (origin) => {
   const configured = [
     process.env.CLIENT_URL,
     process.env.FRONTEND_URL,
-  ].filter(Boolean);
+  ]
+    .filter(Boolean)
+    .map((url) => url.trim().replace(/\/+$/, ""));
 
   if (configured.length === 0) {
     return origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:");
   }
 
-  if (configured.includes(origin)) return true;
-  if (/^https:\/\/[a-zA-Z0-9_-]+\.vercel\.app$/.test(origin)) return true;
+  const normOrigin = origin.replace(/\/+$/, "");
+  if (configured.includes(normOrigin)) return true;
+  if (/^https:\/\/[a-zA-Z0-9_-]+\.vercel\.app$/.test(normOrigin)) return true;
   return false;
 };

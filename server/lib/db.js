@@ -13,9 +13,7 @@ export const connectDB = async () => {
     mongoose.connection.on("error", (err) =>
       console.error("MongoDB runtime error:", err.message)
     );
-    const cleanUri = uri.replace(/\/+$/, "");
-    const targetUri = cleanUri.includes("/chat-app") ? cleanUri : `${cleanUri}/chat-app`;
-    await mongoose.connect(targetUri);
+    await mongoose.connect(uri, { dbName: "chat-app" });
     return true;
   } catch (error) {
     console.error("MongoDB connection failed:", error.message);

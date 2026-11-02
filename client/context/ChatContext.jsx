@@ -91,8 +91,9 @@ export const ChatProvider = ({ children }) => {
 
   // function to messages of selected user OR group
   const getMessages = async (userId) => {
+    setUnseenMessages((prev) => ({ ...prev, [userId]: 0 }));
     try {
-      const { data } = await axios.get(`api/messages/${userId}`);
+      const { data } = await axios.get(`/api/messages/${userId}`);
       if (data.success) {
         setMessages(data.messages);
       }
@@ -216,6 +217,18 @@ export const ChatProvider = ({ children }) => {
             })
         );
     });
+
+    // Listen for bulk delivered updates (e.g. recipient came online, sent messages become delivered)
+    socket.on("messagesDelivered", ({ recipientId }) => {
+        setMessages((prev) => 
+            prev.map((msg) => {
+                if (msg.receiverId === recipientId && msg.status === "sent") {
+                    return { ...msg, status: "delivered" };
+                }
+                return msg;
+            })
+        );
+    });
   };
 
   // function to unsubscribe from messages for selected user
@@ -224,6 +237,7 @@ export const ChatProvider = ({ children }) => {
     socket.off("newMessage");
     socket.off("messageStatusUpdate");
     socket.off("messagesRead");
+    socket.off("messagesDelivered");
   };
 
   useEffect(() => {

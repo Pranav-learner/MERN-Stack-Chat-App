@@ -62,13 +62,14 @@ import { identityContextService, verifyToken, attachSocketIdentity } from "./int
 import { appSessions } from "./controllers/sessionMessagingController.js";
 import { attachSocketSessionContext } from "./session-integration/index.js";
 import Group from "./models/Group.model.js";
+import Message from "./models/Message.model.js";
 import { Server } from "socket.io";
 
 // Create Express app and HTTP server
 const app = express();
 const server = http.createServer(app);
 
-import redis, { cacheUserSocket, removeUserSocket, getOnlineUsers } from "./lib/redis.js";
+import redis, { cacheUserSocket, removeUserSocket, getOnlineUsers, getUserSockets } from "./lib/redis.js";
 
 import { isOriginAllowed } from "./lib/corsPolicy.js";
 export { isOriginAllowed };
@@ -145,6 +146,32 @@ io.on("connection", async (socket) => {
       });
     } catch (error) {
       console.error("Error joining group rooms:", error);
+    }
+
+    // When a user comes online, mark all messages waiting for them as delivered
+    try {
+      const pendingMessages = await Message.find({
+        receiverId: userId,
+        status: "sent",
+      });
+
+      if (pendingMessages.length > 0) {
+        await Message.updateMany(
+          { receiverId: userId, status: "sent" },
+          { status: "delivered" }
+        );
+
+        // Notify each sender that their messages to this user have been delivered
+        const senderIds = [...new Set(pendingMessages.map((m) => m.senderId.toString()))];
+        for (const sId of senderIds) {
+          const senderSockets = await getUserSockets(sId);
+          senderSockets.forEach((sSocketId) => {
+            io.to(sSocketId).emit("messagesDelivered", { recipientId: userId });
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error updating pending messages to delivered:", error?.message);
     }
   }
 
@@ -262,6 +289,11 @@ app.get("/api/status", (req, res) => {
 });
 
 app.get("/health", (req, res) => {
+  const health = getSystemHealth();
+  res.status(health.status === "ok" ? 200 : 503).json(health);
+});
+
+app.get("/api/health", (req, res) => {
   const health = getSystemHealth();
   res.status(health.status === "ok" ? 200 : 503).json(health);
 });

@@ -22,8 +22,11 @@ const provisionSecureIdentity = (axiosInstance, userId) =>
     .then(() => ensureDeviceRegistered(axiosInstance, userId))
     .catch(() => {});
 
-const backendUrl = import.meta.env.VITE_BACKEND_URL;
-axios.defaults.baseURL = backendUrl;
+const rawBackendUrl = import.meta.env.VITE_BACKEND_URL;
+const backendUrl = rawBackendUrl ? rawBackendUrl.replace(/\/+$/, "") : "";
+if (backendUrl) {
+  axios.defaults.baseURL = backendUrl;
+}
 
 export const AuthContext = createContext();
 
@@ -126,7 +129,7 @@ export const AuthProvider = ({ children }) => {
     // query.userId is retained for backward compatibility.
     const deviceId = getLocalDeviceId(userData._id) ?? undefined;
     const jwtToken = localStorage.getItem("token") ?? undefined;
-    const newSocket = io(backendUrl, {
+    const newSocket = io(backendUrl || undefined, {
       query: {
         userId: userData._id,
         deviceId,

@@ -97,9 +97,9 @@ export const sendMessage = async (req, res) => {
 
       const receiverSocketIds = await getUserSockets(receiverId);
       if (receiverSocketIds.length > 0) {
-        receiverSocketIds.forEach((sid) => io.to(sid).emit("newMessage", newMessage));
         newMessage.status = "delivered";
         await newMessage.save();
+        receiverSocketIds.forEach((sid) => io.to(sid).emit("newMessage", newMessage));
       }
       const senderSocketIds = await getUserSockets(senderId);
       senderSocketIds.forEach((sid) => io.to(sid).emit("messageStatusUpdate", newMessage));
@@ -143,9 +143,9 @@ export const sendMessage = async (req, res) => {
         // Emit to all receiver sockets
         const receiverSocketIds = await getUserSockets(receiverId);
         if (receiverSocketIds.length > 0) {
-          receiverSocketIds.forEach((sid) => io.to(sid).emit("newMessage", created));
           created.status = "delivered";
           await created.save();
+          receiverSocketIds.forEach((sid) => io.to(sid).emit("newMessage", created));
         }
         const senderSocketIds = await getUserSockets(senderId);
         senderSocketIds.forEach((sid) => io.to(sid).emit("messageStatusUpdate", created));
@@ -230,7 +230,7 @@ export const getAllMessages = async (req, res) => {
 // Mark messages as read manually
 export const markMessageAsSeen = async (req, res) => {
   try {
-    const { userId } = req.params; // The sender whose messages I'm reading
+    const userId = req.params.id || req.params.userId; // The sender whose messages I'm reading
     const myId = req.user._id;
 
     const updateResult = await Message.updateMany(
