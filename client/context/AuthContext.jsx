@@ -14,12 +14,14 @@ import {
   clearIdentityContext,
   contextRequiresLogout,
 } from "../src/lib/identityStore";
+import { ensurePublicKeyPublished } from "../src/lib/e2eeService";
 
 // Establish identity, then register this device's trust (device requires an
 // identity server-side). Returns a promise; fully failure-tolerant.
-const provisionSecureIdentity = (axiosInstance, userId) =>
+const provisionSecureIdentity = (axiosInstance, userId, user) =>
   ensureIdentityRegistered(axiosInstance, userId)
     .then(() => ensureDeviceRegistered(axiosInstance, userId))
+    .then(() => ensurePublicKeyPublished(axiosInstance, userId, user))
     .catch(() => {});
 
 const rawBackendUrl = import.meta.env.VITE_BACKEND_URL;
@@ -47,7 +49,7 @@ export const AuthProvider = ({ children }) => {
         setAuthUser(data.user);
         connectSocket(data.user);
         // Provision identity + device trust, then load the consolidated context.
-        provisionSecureIdentity(axios, data.user._id).then(() =>
+        provisionSecureIdentity(axios, data.user._id, data.user).then(() =>
           refreshIdentityContext(data.user._id),
         );
       }
@@ -68,7 +70,7 @@ export const AuthProvider = ({ children }) => {
         setToken(data.token);
         localStorage.setItem("token", data.token);
         // Provision identity + device trust, then load the consolidated context.
-        provisionSecureIdentity(axios, data.userData._id).then(() =>
+        provisionSecureIdentity(axios, data.userData._id, data.userData).then(() =>
           refreshIdentityContext(data.userData._id),
         );
         toast.success(data.message);

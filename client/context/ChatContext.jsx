@@ -1,6 +1,15 @@
 import { createContext, useState, useContext, useEffect } from "react";
 import { AuthContext } from "../context/AuthContext";
 import toast from "react-hot-toast";
+import {
+  encryptDirectMessage,
+  decryptDirectMessage,
+  decryptMessageList,
+  encryptMediaFile,
+  uploadEncryptedMedia,
+  cacheMediaUrl,
+  fetchAndDecryptMedia,
+} from "../src/lib/e2eeService";
 
 export const ChatContext = createContext();
 
@@ -97,7 +106,9 @@ export const ChatProvider = ({ children }) => {
     try {
       const { data } = await axios.get(`/api/messages/${userId}`);
       if (data.success) {
-        setMessages(data.messages);
+        const peer = selectedUser && selectedUser._id === userId ? selectedUser : users.find((u) => u._id === userId);
+        const decryptedList = await decryptMessageList(data.messages, authUser?._id, peer, axios);
+        setMessages(decryptedList);
       }
     } catch (error) {
       toast.error(getErrorMsg(error));
@@ -121,9 +132,9 @@ export const ChatProvider = ({ children }) => {
   const sendMessage = async (messagePayload) => {
     try {
       const clientMessageId = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-      const payload = { ...messagePayload, clientMessageId };
 
       if (selectedGroup) {
+        const payload = { ...messagePayload, clientMessageId };
         const { data } = await axios.post(`/api/groups/send/${selectedGroup._id}`, payload);
         if (data.success) {
           setMessages((prevMessages) => {
@@ -136,16 +147,72 @@ export const ChatProvider = ({ children }) => {
           toast.error(data.message);
         }
       } else if (selectedUser) {
+        // Milestone 1 & 2 — Attempt End-to-End Encryption (Direct Message & Media)
+        let sendPayload = { ...messagePayload, clientMessageId };
+        let wasEncrypted = false;
+        let displayedImage = messagePayload.image;
+
+        if (selectedUser.publicKey && authUser?._id) {
+          try {
+            let preparedPayload = { text: messagePayload.text };
+
+            // Milestone 2 — Encrypt media file via Layer 11 Secure Media Platform
+            if (messagePayload.file) {
+              const encryptedMedia = await encryptMediaFile(messagePayload.file);
+              const mediaDoc = await uploadEncryptedMedia(axios, encryptedMedia, selectedUser._id);
+
+              if (displayedImage) {
+                cacheMediaUrl(mediaDoc.mediaId, displayedImage);
+              }
+
+              // Embed encrypted media key & metadata references inside E2EE direct message
+              preparedPayload.media = {
+                mediaId: mediaDoc.mediaId,
+                mediaKey: encryptedMedia.mediaKeyB64,
+                iv: encryptedMedia.ivB64,
+                authTag: encryptedMedia.authTagB64,
+                filename: encryptedMedia.filename,
+                contentType: encryptedMedia.contentType,
+                size: encryptedMedia.plaintextSize,
+                plaintextHash: encryptedMedia.plaintextHash,
+              };
+            } else if (messagePayload.image) {
+              preparedPayload.image = messagePayload.image;
+            }
+
+            const encryptedResult = await encryptDirectMessage(selectedUser, preparedPayload, authUser._id);
+            if (encryptedResult?.securePayload) {
+              sendPayload = {
+                securePayload: encryptedResult.securePayload,
+                sessionId: encryptedResult.sessionId,
+                clientMessageId,
+              };
+              wasEncrypted = true;
+            }
+          } catch (encErr) {
+            console.warn("[e2ee] Direct encryption error, sending via fallback:", encErr);
+          }
+        }
+
         const { data } = await axios.post(
           `api/messages/send/${selectedUser._id}`,
-          payload
+          sendPayload
         );
         if (data.success) {
+          const displayedMessage = wasEncrypted
+            ? {
+                ...data.message,
+                text: messagePayload.text,
+                image: displayedImage,
+                isEncrypted: true,
+              }
+            : data.message;
+
           setMessages((prevMessages) => {
             if (prevMessages.some((m) => m._id === data.message._id || (m.clientMessageId && m.clientMessageId === data.message.clientMessageId))) {
               return prevMessages;
             }
-            return [...prevMessages, data.message];
+            return [...prevMessages, displayedMessage];
           });
         } else {
           toast.error(data.message);
@@ -160,7 +227,7 @@ export const ChatProvider = ({ children }) => {
   const subscribeToMessages = () => {
     if (!socket) return;
 
-    socket.on("newMessage", (newMessage) => {
+    socket.on("newMessage", async (newMessage) => {
       // Handle Group Message
       if (newMessage.groupId) {
         if (selectedGroup && newMessage.groupId === selectedGroup._id) {
@@ -182,20 +249,42 @@ export const ChatProvider = ({ children }) => {
       } 
       // Handle Direct Message
       else {
-        if (selectedUser && newMessage.senderId === selectedUser._id) {
-          newMessage.status = "read";
+        const rawSenderId = typeof newMessage.senderId === 'object' ? newMessage.senderId._id : newMessage.senderId;
+        const senderUser = (selectedUser && selectedUser._id === rawSenderId)
+          ? selectedUser
+          : users.find((u) => u._id === rawSenderId);
+
+        let processedMessage = newMessage;
+        if (newMessage.secure?.encrypted) {
+          const decrypted = await decryptDirectMessage(newMessage, authUser?._id, senderUser);
+          let resolvedImage = decrypted.image;
+          if (!resolvedImage && decrypted.media) {
+            resolvedImage = await fetchAndDecryptMedia(axios, decrypted.media);
+          }
+          processedMessage = {
+            ...newMessage,
+            text: decrypted.text,
+            image: resolvedImage,
+            media: decrypted.media,
+            isEncrypted: decrypted.isEncrypted,
+            failed: decrypted.failed,
+          };
+        }
+
+        if (selectedUser && rawSenderId === selectedUser._id) {
+          processedMessage.status = "read";
           setMessages((prevMessages) => {
-            if (prevMessages.some((m) => m._id === newMessage._id || (m.clientMessageId && m.clientMessageId === newMessage.clientMessageId))) {
+            if (prevMessages.some((m) => m._id === processedMessage._id || (m.clientMessageId && m.clientMessageId === processedMessage.clientMessageId))) {
               return prevMessages;
             }
-            return [...prevMessages, newMessage];
+            return [...prevMessages, processedMessage];
           });
           axios.put(`/api/messages/mark/${selectedUser._id}`);
         } else {
           setUnseenMessages((prevUnseenMessages) => ({
             ...prevUnseenMessages,
-            [newMessage.senderId]: prevUnseenMessages[newMessage.senderId]
-              ? prevUnseenMessages[newMessage.senderId] + 1
+            [rawSenderId]: prevUnseenMessages[rawSenderId]
+              ? prevUnseenMessages[rawSenderId] + 1
               : 1,
           }));
         }

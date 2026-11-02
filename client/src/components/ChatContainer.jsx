@@ -34,7 +34,7 @@ const ChatContainer = () => {
     }
     const reader = new FileReader();
     reader.onloadend = async () => {
-      await sendMessage({ image: reader.result });
+      await sendMessage({ image: reader.result, file });
       e.target.value = "";
     };
     reader.readAsDataURL(file);
@@ -86,6 +86,17 @@ const ChatContainer = () => {
           {selectedUser && onlineUser.includes(selectedUser._id) && (
             <span className="w-2 h-2 rounded-full bg-green-500"></span>
           )}
+          {selectedUser && (
+            selectedUser.publicKey ? (
+              <span className="text-[11px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full flex items-center gap-1 font-normal ml-2">
+                <span>🔒</span> End-to-End Encrypted
+              </span>
+            ) : (
+              <span className="text-[11px] bg-amber-500/10 text-amber-300 border border-amber-500/20 px-2 py-0.5 rounded-full font-normal ml-2">
+                Plaintext (No Key)
+              </span>
+            )
+          )}
           {selectedGroup && (
               <span className="text-xs text-gray-400 ml-2">({selectedGroup.members.length} members)</span>
           )}
@@ -119,12 +130,32 @@ const ChatContainer = () => {
                            <span className="text-[10px] text-gray-400 mr-1 mb-1 self-end">{senderName}</span>
                        )}
                         
-                        {msg.image ? (
-                        <img
-                            src={msg.image}
-                            alt=""
-                            className="max-w-[230px] border border-gray-700 rounded-lg overflow-hidden mb-8"
-                        />
+                        {msg.failed ? (
+                          <div className="p-2.5 max-w-[280px] text-xs rounded-lg mb-8 bg-red-950/80 text-red-200 border border-red-500/40 flex items-start gap-2 shadow-lg backdrop-blur-sm">
+                            <span className="text-sm">⚠️</span>
+                            <div>
+                              <p className="font-semibold text-red-100">Decryption Failed</p>
+                              <p className="text-[11px] text-red-300">Message was tampered with or corrupted in transit.</p>
+                            </div>
+                          </div>
+                        ) : msg.image ? (
+                          <div className="relative group mb-8">
+                            <img
+                                src={msg.image}
+                                alt=""
+                                className="max-w-[230px] border border-gray-700 rounded-lg overflow-hidden shadow-md"
+                            />
+                            {(msg.isEncrypted || msg.media) && (
+                              <span className="absolute top-2 right-2 bg-black/70 backdrop-blur-md px-1.5 py-0.5 rounded text-[10px] text-emerald-300 font-medium border border-emerald-500/30 flex items-center gap-1">
+                                🔒 Encrypted Media
+                              </span>
+                            )}
+                          </div>
+                        ) : msg.media && !msg.image ? (
+                          <div className="p-3 max-w-[220px] text-xs rounded-lg mb-8 bg-gray-800/80 text-gray-300 border border-gray-700 flex items-center gap-2">
+                            <span className="animate-spin text-sm">⏳</span>
+                            <span>Decrypting secure media...</span>
+                          </div>
                         ) : (
                         <p
                             className={`p-2 max-w-[200px] md:text-sm font-light rounded-lg mb-8 break-all bg-violet-500/30 text-white ${
@@ -150,6 +181,9 @@ const ChatContainer = () => {
                     />
                     <p className="text-gray-500 flex items-center justify-center gap-1">
                         {formatMessageTime(msg.createdAt)}
+                        {(msg.isEncrypted || msg.secure?.encrypted) && (
+                            <span title="End-to-End Encrypted" className="text-emerald-400 text-[10px]">🔒</span>
+                        )}
                         {isMe && !selectedGroup && (
                             <span className={`${msg.status === 'read' ? 'text-blue-400' : 'text-gray-500'}`}>
                                 {msg.status === 'sent' ? '✓' : '✓✓'}
@@ -170,7 +204,7 @@ const ChatContainer = () => {
             value={input}
             onKeyDown={(e) => (e.key === "Enter" ? handleSendMessage(e) : null)}
             type="text"
-            placeholder="Send a message"
+            placeholder={selectedUser?.publicKey ? "🔒 Send encrypted message..." : "Send a message"}
             className="flex-1 text-sm p-3 border-none rounded-lg outline-none text-white placeholder-gray-400"
           />
           <input

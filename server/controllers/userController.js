@@ -133,7 +133,7 @@ export const isAuthenticated = async (req, res) => {
 // Controller to update user profile detail
 export const updateProfile = async (req, res) => {
   try {
-    const { profilePic, fullName, bio } = req.body;
+    const { profilePic, fullName, bio, publicKey } = req.body;
     const userId = req.user._id;
 
     const user = await User.findById(userId);
@@ -143,26 +143,28 @@ export const updateProfile = async (req, res) => {
         .json({ success: false, message: "User not found" });
     }
 
+    const updateFields = {
+      fullName: fullName ? fullName.trim() : user.fullName,
+      bio: bio !== undefined ? bio.trim() : user.bio,
+    };
+    if (publicKey && typeof publicKey === "string") {
+      updateFields.publicKey = publicKey;
+    }
+
     let updateduser;
 
     if (!profilePic) {
       updateduser = await User.findByIdAndUpdate(
         userId,
-        {
-          fullName: fullName ? fullName.trim() : user.fullName,
-          bio: bio !== undefined ? bio.trim() : user.bio,
-        },
+        updateFields,
         { new: true }
       ).select("-password");
     } else {
       const upload = await cloudinary.uploader.upload(profilePic);
+      updateFields.profilePic = upload.secure_url;
       updateduser = await User.findByIdAndUpdate(
         userId,
-        {
-          fullName: fullName ? fullName.trim() : user.fullName,
-          bio: bio !== undefined ? bio.trim() : user.bio,
-          profilePic: upload.secure_url,
-        },
+        updateFields,
         { new: true }
       ).select("-password");
     }

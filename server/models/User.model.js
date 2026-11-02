@@ -7,6 +7,7 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true },
     profilePic: { type: String },
     bio: { type: String, default: "" },
+    publicKey: { type: String, default: null }, // E2EE Public Key (base64)
   },
   { timestamps: true }
 );
