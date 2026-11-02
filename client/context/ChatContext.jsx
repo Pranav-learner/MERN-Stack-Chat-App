@@ -13,6 +13,13 @@ import {
   decryptGroupMessage,
   decryptGroupMessageList,
 } from "../src/lib/e2eeService";
+import {
+  enqueueOfflineMessage,
+  flushOfflineOutbox,
+  initSyncManager,
+  subscribeToSyncStatus,
+  updateSyncCheckpoint,
+} from "../src/lib/syncService";
 
 export const ChatContext = createContext();
 
@@ -23,8 +30,55 @@ export const ChatProvider = ({ children }) => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedGroup, setSelectedGroup] = useState(null); // [NEW]
   const [unseenMessages, setUnseenMessages] = useState({});
+  const [syncStatus, setSyncStatus] = useState({
+    isOnline: typeof navigator !== "undefined" ? navigator.onLine : true,
+    pendingCount: 0,
+    status: "synced",
+  });
 
   const { socket, axios, authUser } = useContext(AuthContext);
+
+  useEffect(() => {
+    const unsub = subscribeToSyncStatus((status) => {
+      setSyncStatus(status);
+    });
+
+    initSyncManager(axios, {
+      onMessageSent: (sentMessage) => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.clientMessageId === sentMessage.clientMessageId
+              ? { ...m, ...sentMessage, status: "sent" }
+              : m
+          )
+        );
+        toast.success("Offline message synced and sent!", { id: `sync-${sentMessage.clientMessageId}` });
+      },
+    });
+
+    if (socket) {
+      const handleReconnect = () => {
+        flushOfflineOutbox(axios, {
+          onMessageSent: (sentMessage) => {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.clientMessageId === sentMessage.clientMessageId
+                  ? { ...m, ...sentMessage, status: "sent" }
+                  : m
+              )
+            );
+          },
+        });
+      };
+      socket.on("connect", handleReconnect);
+      return () => {
+        unsub();
+        socket.off("connect", handleReconnect);
+      };
+    }
+
+    return () => unsub();
+  }, [axios, socket]);
 
   // function to get all users
   const getUsers = async () => {
@@ -111,7 +165,21 @@ export const ChatProvider = ({ children }) => {
       if (data.success) {
         const peer = selectedUser && selectedUser._id === userId ? selectedUser : users.find((u) => u._id === userId);
         const decryptedList = await decryptMessageList(data.messages, authUser?._id, peer, axios);
-        setMessages(decryptedList);
+        const queuedForChat = getOfflineOutbox()
+          .filter((m) => m.targetId === userId && m.targetType === "direct")
+          .map((m) => ({
+            _id: m.clientMessageId,
+            clientMessageId: m.clientMessageId,
+            senderId: authUser?._id,
+            receiverId: userId,
+            text: m.displayText,
+            image: m.displayImage,
+            isEncrypted: m.wasEncrypted,
+            status: "queued",
+            createdAt: m.queuedAt,
+          }));
+        setMessages([...decryptedList, ...queuedForChat]);
+        updateSyncCheckpoint(userId, Date.now());
       }
     } catch (error) {
       toast.error(getErrorMsg(error));
@@ -128,7 +196,21 @@ export const ChatProvider = ({ children }) => {
           ? selectedGroup
           : groups.find((g) => g._id === groupId);
         const decryptedList = await decryptGroupMessageList(data.messages, authUser?._id, currentGrp, axios);
-        setMessages(decryptedList);
+        const queuedForChat = getOfflineOutbox()
+          .filter((m) => m.targetId === groupId && m.targetType === "group")
+          .map((m) => ({
+            _id: m.clientMessageId,
+            clientMessageId: m.clientMessageId,
+            senderId: authUser?._id,
+            groupId,
+            text: m.displayText,
+            image: m.displayImage,
+            isEncrypted: m.wasEncrypted,
+            status: "queued",
+            createdAt: m.queuedAt,
+          }));
+        setMessages([...decryptedList, ...queuedForChat]);
+        updateSyncCheckpoint(groupId, Date.now());
       }
     } catch (error) {
       toast.error(getErrorMsg(error));
@@ -137,9 +219,14 @@ export const ChatProvider = ({ children }) => {
 
   // function to send message to selected user or group with idempotency key
   const sendMessage = async (messagePayload) => {
-    try {
-      const clientMessageId = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    const clientMessageId = `msg-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    const currentTargetType = selectedGroup ? "group" : "direct";
+    const currentTargetId = selectedGroup ? selectedGroup._id : selectedUser?._id;
+    let activeSendPayload = null;
+    let activeWasEncrypted = false;
+    let activeDisplayedImage = messagePayload.image;
 
+    try {
       if (selectedGroup) {
         let sendPayload = { ...messagePayload, clientMessageId };
         let wasEncrypted = false;
@@ -188,6 +275,39 @@ export const ChatProvider = ({ children }) => {
           }
         } catch (encGroupErr) {
           console.warn("[e2ee] Group encryption error, sending via fallback:", encGroupErr);
+        }
+
+        activeSendPayload = sendPayload;
+        activeWasEncrypted = wasEncrypted;
+        activeDisplayedImage = displayedImage;
+
+        // Offline check before network attempt
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          enqueueOfflineMessage({
+            targetType: "group",
+            targetId: selectedGroup._id,
+            sendPayload,
+            clientMessageId,
+            displayText: messagePayload.text,
+            displayImage: displayedImage,
+            wasEncrypted,
+          });
+          setMessages((prev) => [
+            ...prev,
+            {
+              _id: clientMessageId,
+              clientMessageId,
+              senderId: authUser._id,
+              groupId: selectedGroup._id,
+              text: messagePayload.text,
+              image: displayedImage,
+              isEncrypted: wasEncrypted,
+              status: "queued",
+              createdAt: Date.now(),
+            },
+          ]);
+          toast("Message queued for offline sync (will send automatically)", { icon: "🕒" });
+          return;
         }
 
         const { data } = await axios.post(`/api/groups/send/${selectedGroup._id}`, sendPayload);
@@ -258,6 +378,39 @@ export const ChatProvider = ({ children }) => {
           }
         }
 
+        activeSendPayload = sendPayload;
+        activeWasEncrypted = wasEncrypted;
+        activeDisplayedImage = displayedImage;
+
+        // Offline check before network attempt
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+          enqueueOfflineMessage({
+            targetType: "direct",
+            targetId: selectedUser._id,
+            sendPayload,
+            clientMessageId,
+            displayText: messagePayload.text,
+            displayImage: displayedImage,
+            wasEncrypted,
+          });
+          setMessages((prev) => [
+            ...prev,
+            {
+              _id: clientMessageId,
+              clientMessageId,
+              senderId: authUser._id,
+              receiverId: selectedUser._id,
+              text: messagePayload.text,
+              image: displayedImage,
+              isEncrypted: wasEncrypted,
+              status: "queued",
+              createdAt: Date.now(),
+            },
+          ]);
+          toast("Message queued for offline sync (will send automatically)", { icon: "🕒" });
+          return;
+        }
+
         const { data } = await axios.post(
           `api/messages/send/${selectedUser._id}`,
           sendPayload
@@ -283,6 +436,35 @@ export const ChatProvider = ({ children }) => {
         }
       }
     } catch (error) {
+      const isNetworkError = (typeof navigator !== "undefined" && !navigator.onLine) || error.code === "ERR_NETWORK" || !error.response;
+      if (isNetworkError && currentTargetId && activeSendPayload) {
+        enqueueOfflineMessage({
+          targetType: currentTargetType,
+          targetId: currentTargetId,
+          sendPayload: activeSendPayload,
+          clientMessageId,
+          displayText: messagePayload.text,
+          displayImage: activeDisplayedImage,
+          wasEncrypted: activeWasEncrypted,
+        });
+
+        const optimisticMessage = {
+          _id: clientMessageId,
+          clientMessageId,
+          senderId: authUser._id,
+          receiverId: selectedUser?._id,
+          groupId: selectedGroup?._id,
+          text: messagePayload.text,
+          image: activeDisplayedImage,
+          isEncrypted: activeWasEncrypted,
+          status: "queued",
+          createdAt: Date.now(),
+        };
+
+        setMessages((prev) => [...prev, optimisticMessage]);
+        toast("Message saved offline (will sync automatically)", { icon: "🕒" });
+        return;
+      }
       toast.error(getErrorMsg(error));
     }
   };
@@ -458,6 +640,7 @@ export const ChatProvider = ({ children }) => {
     inviteToGroup, // [NEW]
     acceptInvite, // [NEW]
     rejectInvite, // [NEW]
+    syncStatus, // [Layer 9]
   };
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 };

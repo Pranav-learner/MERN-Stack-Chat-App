@@ -48,6 +48,7 @@ export function toStoredCiphertext(payload, routing = {}) {
       tag: payload.encryption.tag,
       macAlgorithm: payload.integrity.algorithm,
       mac: payload.integrity.mac,
+      ratchet: payload.ratchet || null,
     },
     // delivery metadata
     status: "sent",
@@ -72,7 +73,7 @@ export function fromStoredCiphertext(record) {
     nonce: s.nonce,
     encryption: { algorithm: s.algorithm, iv: s.iv, ciphertext: s.ciphertext, tag: s.tag },
     integrity: { algorithm: s.macAlgorithm, mac: s.mac },
-    ratchet: null,
+    ratchet: s.ratchet || null,
   };
 }
 

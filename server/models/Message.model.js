@@ -55,6 +55,7 @@ const messageSchema = new mongoose.Schema(
       tag: { type: String }, // base64 (AEAD auth tag)
       macAlgorithm: { type: String }, // hmac-sha256
       mac: { type: String }, // base64 (encrypt-then-MAC)
+      ratchet: { type: mongoose.Schema.Types.Mixed, default: null }, // Layer 5 forward-secrecy ratchet metadata
     },
     clientMessageId: {
       type: String,

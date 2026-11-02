@@ -212,15 +212,186 @@ export async function getOrDeriveSession(myUserId, peerUser) {
   const digest = await crypto.subtle.digest("SHA-256", encKeyBits);
   const keyId = bytesToHex(new Uint8Array(digest)).slice(0, 16);
 
+  const isA = myId < peerId;
+  const sendChainBits = await crypto.subtle.deriveBits(
+    { name: "HKDF", hash: "SHA-256", salt, info: enc.encode(isA ? "ratchet-chain-a-to-b" : "ratchet-chain-b-to-a") },
+    hkdfKey,
+    256
+  );
+  const recvChainBits = await crypto.subtle.deriveBits(
+    { name: "HKDF", hash: "SHA-256", salt, info: enc.encode(isA ? "ratchet-chain-b-to-a" : "ratchet-chain-a-to-b") },
+    hkdfKey,
+    256
+  );
+
   const session = {
     sessionId,
     keyId,
     encKeyBits: new Uint8Array(encKeyBits),
     macKeyBits: new Uint8Array(macKeyBits),
+    generation: 1,
+    sendSeq: 0,
+    recvSeq: 0,
+    sendChainKey: new Uint8Array(sendChainBits),
+    recvChainKey: new Uint8Array(recvChainBits),
+    skippedKeys: new Map(),
   };
 
   sessionCache.set(sessionId, session);
   return session;
+}
+
+// --- Layer 5: Forward Secrecy & Ratchet Ephemeral Keys ------------------------
+
+/**
+ * Advance the sending chain key to derive ephemeral per-message encryption and MAC keys.
+ */
+async function stepRatchetSend(session) {
+  if (!session.sendChainKey) {
+    return {
+      encKeyBits: session.encKeyBits,
+      macKeyBits: session.macKeyBits,
+      ratchetMeta: null,
+    };
+  }
+
+  const seq = session.sendSeq || 0;
+  const chainCryptoKey = await crypto.subtle.importKey(
+    "raw",
+    session.sendChainKey.slice(0, 32),
+    "HKDF",
+    false,
+    ["deriveBits"]
+  );
+  const salt = enc.encode(`ratchet-salt-${session.sessionId}-${seq}`);
+
+  // 1. Derive ephemeral message encryption key & mac key
+  const msgEncBits = await crypto.subtle.deriveBits(
+    { name: "HKDF", hash: "SHA-256", salt, info: enc.encode(`msg-enc-${seq}`) },
+    chainCryptoKey,
+    256
+  );
+  const msgMacBits = await crypto.subtle.deriveBits(
+    { name: "HKDF", hash: "SHA-256", salt, info: enc.encode(`msg-mac-${seq}`) },
+    chainCryptoKey,
+    256
+  );
+
+  // 2. Advance the send chain key (forward secrecy)
+  const nextChainBits = await crypto.subtle.deriveBits(
+    { name: "HKDF", hash: "SHA-256", salt, info: enc.encode(`chain-advance-${seq}`) },
+    chainCryptoKey,
+    256
+  );
+
+  session.sendChainKey = new Uint8Array(nextChainBits);
+  session.sendSeq = seq + 1;
+
+  const ratchetMeta = {
+    generation: session.generation || 1,
+    seq,
+    prevSeq: Math.max(0, seq - 1),
+    keyFingerprint: session.keyId,
+  };
+
+  return {
+    encKeyBits: new Uint8Array(msgEncBits),
+    macKeyBits: new Uint8Array(msgMacBits),
+    ratchetMeta,
+  };
+}
+
+/**
+ * Advance the receiving chain key to derive matching ephemeral per-message keys.
+ */
+async function stepRatchetReceive(session, ratchetMeta) {
+  if (!ratchetMeta || typeof ratchetMeta.seq !== "number" || !session.recvChainKey) {
+    return {
+      encKeyBits: session.encKeyBits,
+      macKeyBits: session.macKeyBits,
+    };
+  }
+
+  const targetSeq = ratchetMeta.seq;
+
+  // Check if this was a previously skipped key
+  if (session.skippedKeys && session.skippedKeys.has(targetSeq)) {
+    const keys = session.skippedKeys.get(targetSeq);
+    session.skippedKeys.delete(targetSeq); // Discard immediately on use
+    return keys;
+  }
+
+  // Fast-forward until targetSeq (capped to max 200 steps to protect against malformed seq)
+  while (session.recvSeq < targetSeq && session.recvSeq < targetSeq + 200) {
+    const s = session.recvSeq;
+    const chainCryptoKey = await crypto.subtle.importKey(
+      "raw",
+      session.recvChainKey.slice(0, 32),
+      "HKDF",
+      false,
+      ["deriveBits"]
+    );
+    const salt = enc.encode(`ratchet-salt-${session.sessionId}-${s}`);
+
+    const skippedEnc = await crypto.subtle.deriveBits(
+      { name: "HKDF", hash: "SHA-256", salt, info: enc.encode(`msg-enc-${s}`) },
+      chainCryptoKey,
+      256
+    );
+    const skippedMac = await crypto.subtle.deriveBits(
+      { name: "HKDF", hash: "SHA-256", salt, info: enc.encode(`msg-mac-${s}`) },
+      chainCryptoKey,
+      256
+    );
+    const nextChain = await crypto.subtle.deriveBits(
+      { name: "HKDF", hash: "SHA-256", salt, info: enc.encode(`chain-advance-${s}`) },
+      chainCryptoKey,
+      256
+    );
+
+    if (!session.skippedKeys) session.skippedKeys = new Map();
+    session.skippedKeys.set(s, {
+      encKeyBits: new Uint8Array(skippedEnc),
+      macKeyBits: new Uint8Array(skippedMac),
+    });
+    session.recvChainKey = new Uint8Array(nextChain);
+    session.recvSeq = s + 1;
+  }
+
+  // Current target sequence step
+  const currentSeq = session.recvSeq;
+  const chainCryptoKey = await crypto.subtle.importKey(
+    "raw",
+    session.recvChainKey.slice(0, 32),
+    "HKDF",
+    false,
+    ["deriveBits"]
+  );
+  const salt = enc.encode(`ratchet-salt-${session.sessionId}-${currentSeq}`);
+
+  const msgEncBits = await crypto.subtle.deriveBits(
+    { name: "HKDF", hash: "SHA-256", salt, info: enc.encode(`msg-enc-${currentSeq}`) },
+    chainCryptoKey,
+    256
+  );
+  const msgMacBits = await crypto.subtle.deriveBits(
+    { name: "HKDF", hash: "SHA-256", salt, info: enc.encode(`msg-mac-${currentSeq}`) },
+    chainCryptoKey,
+    256
+  );
+  const nextChainBits = await crypto.subtle.deriveBits(
+    { name: "HKDF", hash: "SHA-256", salt, info: enc.encode(`chain-advance-${currentSeq}`) },
+    chainCryptoKey,
+    256
+  );
+
+  session.recvChainKey = new Uint8Array(nextChainBits);
+  session.recvSeq = currentSeq + 1;
+
+  return {
+    encKeyBits: new Uint8Array(msgEncBits),
+    macKeyBits: new Uint8Array(msgMacBits),
+  };
 }
 
 // --- Encrypt & Decrypt -------------------------------------------------------
@@ -233,6 +404,8 @@ export async function encryptDirectMessage(peerUser, messagePayload, myUserId) {
   if (!session) {
     return null; // Cannot encrypt; fall back to unencrypted or caller handles
   }
+
+  const { encKeyBits, macKeyBits, ratchetMeta } = await stepRatchetSend(session);
 
   const meta = {
     v: 1,
@@ -250,7 +423,7 @@ export async function encryptDirectMessage(peerUser, messagePayload, myUserId) {
   const aad = buildCanonicalAAD(meta);
   const iv = crypto.getRandomValues(new Uint8Array(12));
 
-  const aesKey = await crypto.subtle.importKey("raw", session.encKeyBits, "AES-GCM", false, ["encrypt"]);
+  const aesKey = await crypto.subtle.importKey("raw", encKeyBits, "AES-GCM", false, ["encrypt"]);
   const plaintext = enc.encode(JSON.stringify(messagePayload || {}));
 
   const sealed = new Uint8Array(
@@ -267,7 +440,7 @@ export async function encryptDirectMessage(peerUser, messagePayload, myUserId) {
   // Encrypt-then-MAC: HMAC over AAD || IV || Ciphertext || Tag
   const hmacKey = await crypto.subtle.importKey(
     "raw",
-    session.macKeyBits,
+    macKeyBits,
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"]
@@ -287,7 +460,7 @@ export async function encryptDirectMessage(peerUser, messagePayload, myUserId) {
       algorithm: "hmac-sha256",
       mac: toBase64(mac),
     },
-    ratchet: null,
+    ratchet: ratchetMeta,
   };
 
   return {
@@ -322,6 +495,8 @@ export async function decryptDirectMessage(messageDoc, myUserId, peerUser) {
   const s = messageDoc.secure;
 
   try {
+    const { encKeyBits, macKeyBits } = await stepRatchetReceive(session, s.ratchet);
+
     const meta = {
       v: s.v || 1,
       payloadVersion: s.payloadVersion || 1,
@@ -344,7 +519,7 @@ export async function decryptDirectMessage(messageDoc, myUserId, peerUser) {
     // 1. Verify HMAC
     const hmacKey = await crypto.subtle.importKey(
       "raw",
-      session.macKeyBits,
+      macKeyBits,
       { name: "HMAC", hash: "SHA-256" },
       false,
       ["sign"]
@@ -357,7 +532,7 @@ export async function decryptDirectMessage(messageDoc, myUserId, peerUser) {
     }
 
     // 2. Decrypt AES-GCM
-    const aesKey = await crypto.subtle.importKey("raw", session.encKeyBits, "AES-GCM", false, ["decrypt"]);
+    const aesKey = await crypto.subtle.importKey("raw", encKeyBits, "AES-GCM", false, ["decrypt"]);
     const combined = concatBytes(ciphertext, tag);
     const decryptedBytes = await crypto.subtle.decrypt(
       { name: "AES-GCM", iv, additionalData: aad, tagLength: 128 },
@@ -768,6 +943,16 @@ export async function encryptGroupMessage(groupId, messagePayload, myUserId, gro
   const hmacInput = concatBytes(aad, iv, ciphertext, tag);
   const mac = new Uint8Array(await crypto.subtle.sign("HMAC", hmacKey, hmacInput));
 
+  const seq = (groupKeyRecord.sendSeq || 0);
+  groupKeyRecord.sendSeq = seq + 1;
+
+  const ratchetMeta = {
+    generation: groupKeyRecord.epoch || 1,
+    seq,
+    prevSeq: Math.max(0, seq - 1),
+    keyFingerprint: `grpkey_${groupId}`,
+  };
+
   const securePayload = {
     ...meta,
     encryption: {
@@ -780,7 +965,7 @@ export async function encryptGroupMessage(groupId, messagePayload, myUserId, gro
       algorithm: "hmac-sha256",
       mac: toBase64(mac),
     },
-    ratchet: null,
+    ratchet: ratchetMeta,
   };
 
   return {

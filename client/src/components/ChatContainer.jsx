@@ -7,7 +7,7 @@ import { AuthContext } from "../../context/AuthContext";
 import toast from "react-hot-toast";
 
 const ChatContainer = () => {
-  const { messages, selectedUser, setSelectedUser, sendMessage, getMessages, selectedGroup, setSelectedGroup, getGroupMessages } =
+  const { messages, selectedUser, setSelectedUser, sendMessage, getMessages, selectedGroup, setSelectedGroup, getGroupMessages, syncStatus } =
     useContext(ChatContext);
   const { authUser, onlineUser } = useContext(AuthContext);
 
@@ -105,6 +105,25 @@ const ChatContainer = () => {
               </span>
             </>
           )}
+
+          {syncStatus && (
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full ml-auto flex items-center gap-1 ${
+                syncStatus.status === "offline"
+                  ? "bg-red-500/20 text-red-300 border border-red-500/30"
+                  : syncStatus.status === "syncing"
+                  ? "bg-blue-500/20 text-blue-300 border border-blue-500/30 animate-pulse"
+                  : "text-gray-400 bg-white/5 border border-white/10"
+              }`}
+              title="Layer 9 — Offline Sync & State Replication"
+            >
+              {syncStatus.status === "offline"
+                ? `⚠️ Offline (${syncStatus.pendingCount} queued)`
+                : syncStatus.status === "syncing"
+                ? "🔄 Syncing..."
+                : "⚡ Synced"}
+            </span>
+          )}
         </p>
         <img
           onClick={() => { setSelectedUser(null); setSelectedGroup(null); }}
@@ -189,9 +208,15 @@ const ChatContainer = () => {
                         {(msg.isEncrypted || msg.secure?.encrypted) && (
                             <span title="End-to-End Encrypted" className="text-emerald-400 text-[10px]">🔒</span>
                         )}
-                        {isMe && !selectedGroup && (
+                        {isMe && (
                             <span className={`${msg.status === 'read' ? 'text-blue-400' : 'text-gray-500'}`}>
-                                {msg.status === 'sent' ? '✓' : '✓✓'}
+                                {msg.status === 'queued' ? (
+                                  <span title="Queued offline for sync" className="text-amber-400 font-bold">🕒</span>
+                                ) : msg.status === 'sent' ? (
+                                  '✓'
+                                ) : (
+                                  '✓✓'
+                                )}
                             </span>
                         )}
                     </p>
