@@ -1,6 +1,7 @@
 import Group from "../models/Group.model.js";
 import Message from "../models/Message.model.js";
 import { io } from "../lib/socket.js";
+import { getUserSockets } from "../lib/redis.js";
 
 export const createGroup = async (req, res) => {
   try {
@@ -21,7 +22,35 @@ export const createGroup = async (req, res) => {
 
     await newGroup.save();
 
-    res.status(201).json({ success: true, group: newGroup });
+    // Populate group details so client receives consistent format
+    let populatedGroup = newGroup;
+    try {
+      populatedGroup = await Group.findById(newGroup._id)
+        .populate("members", "-password")
+        .populate("pendingMembers", "-password")
+        .populate("admin", "-password");
+    } catch {
+      populatedGroup = newGroup;
+    }
+
+    // Real-time broadcast to all invited users
+    if (Array.isArray(invitedUserIds) && invitedUserIds.length > 0) {
+      for (const uid of invitedUserIds) {
+        try {
+          const userSocketIds = await getUserSockets(uid);
+          userSocketIds.forEach((sid) => {
+            io.to(sid).emit("groupInvite", {
+              group: populatedGroup,
+              message: `You were invited to group "${newGroup.name}"!`,
+            });
+          });
+        } catch (socketErr) {
+          console.warn("Failed to emit groupInvite to user:", uid, socketErr?.message);
+        }
+      }
+    }
+
+    res.status(201).json({ success: true, group: populatedGroup });
   } catch (error) {
     console.error("Error in createGroup controller:", error.message);
     res.status(500).json({ success: false, message: "Internal Server Error" });
@@ -53,7 +82,29 @@ export const inviteToGroup = async (req, res) => {
     group.pendingMembers.push(userId);
     await group.save();
 
-    res.status(200).json({ success: true, message: "User invited successfully" });
+    let populatedGroup = group;
+    try {
+      populatedGroup = await Group.findById(group._id)
+        .populate("members", "-password")
+        .populate("pendingMembers", "-password")
+        .populate("admin", "-password");
+    } catch {
+      populatedGroup = group;
+    }
+
+    try {
+      const userSocketIds = await getUserSockets(userId);
+      userSocketIds.forEach((sid) => {
+        io.to(sid).emit("groupInvite", {
+          group: populatedGroup,
+          message: `You were invited to group "${group.name}"!`,
+        });
+      });
+    } catch (socketErr) {
+      console.warn("Failed to emit groupInvite:", socketErr?.message);
+    }
+
+    res.status(200).json({ success: true, message: "User invited successfully", group: populatedGroup });
   } catch (error) {
     console.error("Error in inviteToGroup controller:", error.message);
     res.status(500).json({ success: false, message: "Internal Server Error" });
@@ -79,7 +130,27 @@ export const acceptInvite = async (req, res) => {
     group.members.push(userId);
     await group.save();
 
-    res.status(200).json({ success: true, message: "Invitation accepted", group });
+    let populatedGroup = group;
+    try {
+      populatedGroup = await Group.findById(group._id)
+        .populate("members", "-password")
+        .populate("pendingMembers", "-password")
+        .populate("admin", "-password");
+    } catch {
+      populatedGroup = group;
+    }
+
+    // Broadcast update to all members
+    for (const member of group.members) {
+      try {
+        const memberSockets = await getUserSockets(member);
+        memberSockets.forEach((sid) => {
+          io.to(sid).emit("groupUpdated", populatedGroup);
+        });
+      } catch {}
+    }
+
+    res.status(200).json({ success: true, message: "Invitation accepted", group: populatedGroup });
   } catch (error) {
     console.error("Error in acceptInvite controller:", error.message);
     res.status(500).json({ success: false, message: "Internal Server Error" });

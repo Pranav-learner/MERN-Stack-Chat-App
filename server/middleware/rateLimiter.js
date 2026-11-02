@@ -26,12 +26,13 @@ export function createRateLimiter(options = {}) {
   const keyPrefix = options.keyPrefix || "rl";
 
   return async function rateLimiter(req, res, next) {
-    // In test environment, allow bypassing or higher threshold unless explicitly testing rate limits
-    if (process.env.NODE_ENV === "test" && req.headers["x-bypass-ratelimit"] === "true") {
+    // In test / non-production environments, allow bypassing or higher threshold unless explicitly testing rate limits
+    if (process.env.NODE_ENV !== "production" && req.headers["x-bypass-ratelimit"] === "true") {
       return next();
     }
 
-    const ip = req.ip || req.headers["x-forwarded-for"] || req.socket.remoteAddress || "127.0.0.1";
+    const forwarded = req.headers["x-forwarded-for"];
+    const ip = (typeof forwarded === "string" ? forwarded.split(",")[0].trim() : null) || req.ip || req.socket?.remoteAddress || "127.0.0.1";
     const key = `${keyPrefix}:${ip}`;
     const now = Date.now();
 

@@ -148,6 +148,12 @@ io.on("connection", async (socket) => {
       console.error("Error joining group rooms:", error);
     }
 
+    socket.on("joinGroup", (groupId) => {
+      if (groupId) {
+        socket.join(String(groupId));
+      }
+    });
+
     // When a user comes online, mark all messages waiting for them as delivered
     try {
       const pendingMessages = await Message.find({

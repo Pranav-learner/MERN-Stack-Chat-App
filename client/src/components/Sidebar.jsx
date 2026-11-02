@@ -59,8 +59,16 @@ const Sidebar = () => {
     }
   }, [selectedUser]);
 
-  // Handle invite acceptance (simple implementation: if in pendingMembers)
-  const isPending = (group) => group.pendingMembers.some(member => member._id === authUser._id);
+  // Handle invite acceptance (handles both populated objects and raw IDs)
+  const isPending = (group) =>
+    Array.isArray(group?.pendingMembers) &&
+    group.pendingMembers.some((member) => {
+      const memberId = member?._id?.toString() || member?.toString();
+      const myId = authUser?._id?.toString();
+      return Boolean(memberId && myId && memberId === myId);
+    });
+
+  const pendingInvitesCount = (groups || []).filter(isPending).length;
 
   return (
     <div
@@ -102,10 +110,18 @@ const Sidebar = () => {
                 Direct Messages
             </button>
             <button 
-                className={`text-sm font-semibold pb-1 ${activeTab === "groups" ? "text-violet-400 border-b-2 border-violet-400" : "text-gray-400"}`}
-                onClick={() => setActiveTab("groups")}
+                className={`relative text-sm font-semibold pb-1 flex items-center gap-1.5 ${activeTab === "groups" ? "text-violet-400 border-b-2 border-violet-400" : "text-gray-400"}`}
+                onClick={() => {
+                  setActiveTab("groups");
+                  fetchGroups();
+                }}
             >
                 Groups
+                {pendingInvitesCount > 0 && (
+                  <span className="bg-violet-600 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+                    {pendingInvitesCount}
+                  </span>
+                )}
             </button>
         </div>
 

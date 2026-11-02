@@ -47,6 +47,7 @@ export const ChatProvider = ({ children }) => {
       const { data } = await axios.post("/api/groups/create", { name, invitedUserIds });
       if (data.success) {
         setGroups((prev) => [...prev, data.group]);
+        socket?.emit("joinGroup", data.group._id);
         toast.success("Group created successfully");
         return true;
       }
@@ -70,6 +71,7 @@ export const ChatProvider = ({ children }) => {
       const { data } = await axios.post("/api/groups/accept", { groupId });
       if (data.success) {
         toast.success(data.message);
+        socket?.emit("joinGroup", groupId);
         fetchGroups(); // refresh to update member status
       }
     } catch (error) {
@@ -104,6 +106,7 @@ export const ChatProvider = ({ children }) => {
 
   const getGroupMessages = async (groupId) => {
     setUnseenMessages((prev) => ({ ...prev, [groupId]: 0 }));
+    socket?.emit("joinGroup", groupId);
     try {
       const { data } = await axios.get(`/api/groups/${groupId}/messages`);
       if (data.success) {
@@ -229,6 +232,22 @@ export const ChatProvider = ({ children }) => {
             })
         );
     });
+
+    // Listen for new group invitations in real time
+    socket.on("groupInvite", ({ group, message }) => {
+      setGroups((prev) => {
+        if (prev.some((g) => g._id === group._id)) return prev;
+        return [group, ...prev];
+      });
+      toast.success(message || `You were invited to group "${group.name}"!`);
+    });
+
+    // Listen for group membership/profile updates in real time
+    socket.on("groupUpdated", (updatedGroup) => {
+      setGroups((prev) =>
+        prev.map((g) => (g._id === updatedGroup._id ? updatedGroup : g))
+      );
+    });
   };
 
   // function to unsubscribe from messages for selected user
@@ -238,6 +257,8 @@ export const ChatProvider = ({ children }) => {
     socket.off("messageStatusUpdate");
     socket.off("messagesRead");
     socket.off("messagesDelivered");
+    socket.off("groupInvite");
+    socket.off("groupUpdated");
   };
 
   useEffect(() => {
